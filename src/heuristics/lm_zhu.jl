@@ -1,3 +1,6 @@
+
+include("pgraph.jl")
+
 mutable struct graph_node
   labels::Set{Int}
   graph_node() = new()
@@ -14,13 +17,14 @@ function deepcopy_vector(vec::Vector{graph_node})
 end
 
 function compute_propagation(pgraph::PlanningGraph)
-  
   triggers = Vector{Vector{Int}}()
 
   n_conditions = length(pgraph.conditions)
   resize!(triggers, n_conditions)
 
-  for (i, conditions) in cond_children
+  cond_children = pgraph.cond_children
+
+  for (i, conditions) in enumerate(cond_children)
     for tuple in conditions
       idx_action, idx_precond = tuple
       push!(triggers[i], idx_action)
@@ -28,51 +32,6 @@ function compute_propagation(pgraph::PlanningGraph)
   end
 
   return triggers
-end
-
-
-function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
-
-  n_conditions = length(pgraph.conditions)
-  triggers = compute_propagation(pgraph)
-
-  
-  set = Set()
-
-  init_idxs = pgraph_init_idxs(graph, domain, state)
-  prop_layer =  Vector{graph_node}()
-
-  for i in findall(init_idxs)
-    push!(prop_layer[i].labels, i)
-  end
-
-  for (i, conditions) in pgraph.conditions
-    push!(set, triggers[i])
-  end
-
-  changes = true
-
-  while(changes)
-    next_layer = deepcopy(prop_layer)
-    next_trigger = Set()
-    changes = false
-    for i in triggers
-      precond = graph.act_parents[i]
-      if (precond_empty(prop_layer, precond))
-        changed = apply_action_and_propagate(layer, graph, i, next_layer)
-
-        if (!isempty(changed))
-          changes = true
-          for j in changed
-            push!(next_trigger, triggers[j])
-          end
-        end
-      end
-    end
-    prop_layer = next_layer
-    triggers = next_trigger
-  end
-  return prop_layer
 end
 
 function effect_empty(layer::Vector{graph_node}, effect::Vector{Int})
@@ -150,6 +109,49 @@ function union_effect(layer::Vector{graph_node}, precond::Vector{Int})
       union!(result, layer[i].labels) 
   end
   return result
+end
+
+function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
+
+  n_conditions = length(pgraph.conditions)
+  triggers = compute_propagation(pgraph)
+  
+  set = Set()
+
+  init_idxs = pgraph_init_idxs(graph, domain, state)
+  prop_layer =  Vector{graph_node}()
+
+  for i in findall(init_idxs)
+    push!(prop_layer[i].labels, i)
+  end
+
+  for (i, conditions) in pgraph.conditions
+    push!(set, triggers[i])
+  end
+
+  changes = true
+
+  while(changes)
+    next_layer = deepcopy(prop_layer)
+    next_trigger = Set()
+    changes = false
+    for i in triggers
+      precond = graph.act_parents[i]
+      if (precond_empty(prop_layer, precond))
+        changed = apply_action_and_propagate(layer, graph, i, next_layer)
+
+        if (!isempty(changed))
+          changes = true
+          for j in changed
+            push!(next_trigger, triggers[j])
+          end
+        end
+      end
+    end
+    prop_layer = next_layer
+    triggers = next_trigger
+  end
+  return prop_layer
 end
 
 include("pgraph.jl")
