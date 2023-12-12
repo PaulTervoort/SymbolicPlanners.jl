@@ -60,24 +60,20 @@ function apply_action_and_propagate(layer::Vector{graph_node}, pgraph::PlanningG
   result = Set{Int}()
 
   precond_union = union_preconditions(layer, pgraph.act_parents[action])
- 
+
   for effect in pgraph.act_children[action]
-    if (length(next_layer[effect].labels) == 1)
-      continue
-    end
+    precond_effect = copy(precond_union)
+    union_eff = union(precond_effect, effect)
 
-    if (!effect_empty(layer, triggers[effect])) 
-      precond_effect = copy(precond_union)
-      union_eff = union_effect(layer, pgraph.act_children[action])
-      union!(precond_effect, union_eff)
+    union_effects = union_effect(layer, pgraph.act_children[action])
+    union!(precond_effect, union_effects)
 
-      if (labels_propagated(next_layer[effect].labels, precond_effect, effect))
-       push!(result, effect)
-      end
+    if (labels_propagated(next_layer[effect].labels, precond_effect, effect)) 
+      push!(result, effect)
+      next_layer[effect].labels = union_eff
     end
 
   end
-
 
   return result
 end
@@ -155,9 +151,8 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
       precond = pgraph.act_parents[i]
 
       if (precond_empty(prop_layer, precond))
-
+         
         changed = apply_action_and_propagate(prop_layer, pgraph, i, next_layer, triggers)
-
         if (!isempty(changed))
           
           changes = true
@@ -173,6 +168,19 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
     prop_layer = next_layer
     triggered = next_trigger
   end
+
+  n_action = length(pgraph.actions)
+ 
+  res = Set{Int}()
+
+  for out in pgraph.act_parents[n_action]
+    for i in out
+      for j in prop_layer[i].labels
+      push!(res, j)
+      end
+    end
+  end
+
   return prop_layer
 end
 
