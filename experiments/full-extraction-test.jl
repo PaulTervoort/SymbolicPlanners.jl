@@ -1,4 +1,4 @@
-# Run using 'julia --project=. experiments/landmark-test.jl'
+# Run using 'julia --project=. experiments/full-extraction-test.jl'
 # Can also be ran using 'julia ./experiments/landmark-test.jl' after adding all the bellow packages in the julia pkg manager
 using PDDL, SymbolicPlanners, Test, PlanningDomains
 
@@ -16,18 +16,10 @@ planner = AStarPlanner(HAdd(), save_search=true)
 
 ## Run Planner ##
 
-println("Verifying interpreted")
+println("Verifying landmark extraction")
 stats = @timed begin
-    sol = planner(domain, state, spec)
+    landmarks = full_landmark_extraction(domain, problem)
 end
-@test is_goal(spec, domain, sol.trajectory[end])
-println("Interpreted Finished in ", stats.time, " seconds")
+# @test is_goal(spec, domain, sol.trajectory[end])
+println("Landmark extraction finished in ", stats.time, " seconds")
 
-cdomain, cstate = compiled(domain, state)
-
-println("Verifying compiled")
-stats = @timed begin
-    sol = planner(cdomain, cstate, spec)
-end
-@test is_goal(spec, cdomain, sol.trajectory[end])
-println("Compiled Finished ", stats.time, " seconds")

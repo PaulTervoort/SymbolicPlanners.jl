@@ -39,16 +39,15 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
     
     # Compute dependency orders of landmarks
 
+    verified_landmarks = union!(verified_landmarks, disjuctive_landmarks)
 
+    return verified_landmarks
     
 end
 
 
 
-function propagate_landmarks(landmark_graph::LandmarkGraph) {
-    
-} 
-
+function propagate_landmarks(landmark_graph::LandmarkGraph)
 
 end
 
