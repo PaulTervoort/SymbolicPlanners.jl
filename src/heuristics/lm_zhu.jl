@@ -6,15 +6,15 @@ mutable struct graph_node
   graph_node() = new()
 end
 
-function deepcopy(node::graph_node)
-  new_node = graph_node()
-  new_node_labels = deepcopy(node.labels)
-  return new_node
-end
+# function deepcopy(node::graph_node)
+#  new_node = graph_node()
+#  new_node.labels = deepcopy(node.labels)
+#  return new_node
+# end
 
-function deepcopy_vector(vec::Vector{graph_node})
-  return [deepcopy(node) for node in vec]
-end
+# function deepcopy_vector(vec::Vector{graph_node})
+#  return [deepcopy(node) for node in vec]
+# end
 
 function compute_propagation(pgraph::PlanningGraph)
   triggers = Vector{Vector{Int}}()
@@ -22,11 +22,12 @@ function compute_propagation(pgraph::PlanningGraph)
   n_conditions = length(pgraph.conditions)
   resize!(triggers, n_conditions)
 
-  cond_children = pgraph.cond_children
+  for (i, conditions) in enumerate(pgraph.cond_children)
+    triggers[i] = Vector{Int}()
 
-  for (i, conditions) in enumerate(cond_children)
     for tuple in conditions
       idx_action, idx_precond = tuple
+
       push!(triggers[i], idx_action)
     end
   end
@@ -35,8 +36,8 @@ function compute_propagation(pgraph::PlanningGraph)
 end
 
 function effect_empty(layer::Vector{graph_node}, effect::Vector{Int})
-  for (i, cond) in enumerate act_children
-    if (isempty(layer[i].labels))
+  for cond in effect
+    if(isempty(layer[cond].labels))
       return false
     end
   end
@@ -44,50 +45,53 @@ function effect_empty(layer::Vector{graph_node}, effect::Vector{Int})
 end
 
 function precond_empty(layer::Vector{graph_node}, precond::Vector{Vector{Int}})
-  for (i, out) in enumerate(precond)
-    for (j, cond) in enumerate(out)
-      if (isempty(layer[j].labels))
+  for outer in precond
+    for cond in outer
+      if (isempty(layer[cond].labels))
         return false
       end
     end
   end
-    return true
+  return true
 end
 
 
-function apply_action_and_propagate(layer::Vector{graph_node}, graph::PlanningGraph, action::Int, next_layer::Vector{graph_node})
+function apply_action_and_propagate(layer::Vector{graph_node}, pgraph::PlanningGraph, action::Int, next_layer::Vector{graph_node}, triggers::Vector{Vector{Int}})
   result = Set{Int}()
 
-  precond_union = union_preconditions(layer, graph.act_parents[action])
-
-  for (i, effects) in graph.act_children[action]
-    if(length(next_layer[i].labels) == 1)
+  precond_union = union_preconditions(layer, pgraph.act_parents[action])
+ 
+  for effect in pgraph.act_children[action]
+    if (length(next_layer[effect].labels) == 1)
       continue
     end
 
-    if (effect_empty(layer, effects))
+    if (!effect_empty(layer, triggers[effect])) 
       precond_effect = copy(precond_union)
-      union!(precond_effect, union_effect(layer, effects))
+      union_eff = union_effect(layer, pgraph.act_children[action])
+      union!(precond_effect, union_eff)
 
-      if (labels_propagated(next_layer[i].labels, precond_effect,i))
-        push(result, i)
+      if (labels_propagated(next_layer[effect].labels, precond_effect, effect))
+       push!(result, effect)
       end
     end
+
   end
+
 
   return result
 end
 
 function labels_propagated(old_labels::Set{Int}, new_labels::Set{Int}, condition::Int)
-  copy_old = copy(old_labels)
+  copy_old = deepcopy(old_labels)
 
   if(!isempty(old_labels))
-    old_labels = intersect(old_labels, new_labels)
+    intersect!(old_labels, new_labels)
   else
     old_labels = new_labels
   end
 
-  push!(old_labels, conditions)
+  push!(old_labels, condition)
 
   return length(old_labels) != length(copy_old)
 end
@@ -95,19 +99,21 @@ end
 function union_preconditions(layer::Vector{graph_node}, precond::Vector{Vector{Int}})
   result = Set{Int}()
 
-  for (i, out) in enumerate(precond)
-    for (j, cond) in enumerate(out)
-      union!(result, layer[i].labels) 
+  for out in precond
+    for cond in out
+      union!(result, layer[cond].labels)
     end
   end
   return result
 end
 
-function union_effect(layer::Vector{graph_node}, precond::Vector{Int})
+function union_effect(layer::Vector{graph_node}, effect::Vector{Int})
   result = Set{Int}()
-  for (i, cond) in enumerate act_children
-      union!(result, layer[i].labels) 
+
+  for cond in effect
+    union!(result, layer[cond].labels)
   end
+
   return result
 end
 
@@ -116,17 +122,26 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
   n_conditions = length(pgraph.conditions)
   triggers = compute_propagation(pgraph)
   
-  set = Set()
+  triggered = Set{Int}()
 
-  init_idxs = pgraph_init_idxs(graph, domain, state)
+  init_idxs = pgraph_init_idxs(pgraph, domain, state)
+  # prop_layer::Vector{graph_node}()
   prop_layer =  Vector{graph_node}()
+
+  for i in 1:n_conditions
+    node = graph_node()
+    node.labels = Set{Int}()
+    push!(prop_layer, node)
+  end
 
   for i in findall(init_idxs)
     push!(prop_layer[i].labels, i)
   end
 
-  for (i, conditions) in pgraph.conditions
-    push!(set, triggers[i])
+  for (i, conditions) in enumerate(pgraph.conditions)
+    for action_id in triggers[i]
+      push!(triggered, action_id)
+    end
   end
 
   changes = true
@@ -135,21 +150,28 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
     next_layer = deepcopy(prop_layer)
     next_trigger = Set()
     changes = false
-    for i in triggers
-      precond = graph.act_parents[i]
+    for i in triggered
+      # precond::Vector{Vector{Int}}
+      precond = pgraph.act_parents[i]
+
       if (precond_empty(prop_layer, precond))
-        changed = apply_action_and_propagate(layer, graph, i, next_layer)
+
+        changed = apply_action_and_propagate(prop_layer, pgraph, i, next_layer, triggers)
 
         if (!isempty(changed))
+          
           changes = true
           for j in changed
-            push!(next_trigger, triggers[j])
+            for val in triggers[j]
+              push!(next_trigger, val)
+            end
           end
         end
       end
+
     end
     prop_layer = next_layer
-    triggers = next_trigger
+    triggered = next_trigger
   end
   return prop_layer
 end
