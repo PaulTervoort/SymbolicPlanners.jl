@@ -7,20 +7,20 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
     spec = Specification(problem)
 
     # Compute landmark graph
-    landmark_graph = compute_landmark_graph(domain, start_state, spec)
+    (landmark_graph, planning_graph) = compute_landmark_graph(domain, start_state, spec)
     
     # Extract landmarks from landmark graph
     landmarks = Set{Landmark}()
 
     for landmark_node in landmark_graph.nodes
-        landmarks.add(landmark_node.landmark)    
+        push!(landmarks, landmark_node.landmark)    
     end
 
     # Propagate landmarks
     propagated_landmarks = propagate_landmarks(landmark_graph)
 
     # Merge initial and propagated landmarks
-    landmarks = union!(landmarks, propagated_landmarks)
+    # landmarks = union!(landmarks, propagated_landmarks)
 
 
 
@@ -29,7 +29,7 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
     # Landmarks are verified by checking if the goals are reachable if the landmark is removed from the delete list of the actions leading to them
     # If the goals are reachable, the landmark is not a landmark and is removed from the set of landmarks
     # If the goals are not reachable, the landmark is a landmark and is added to the set of landmarks
-    verified_landmarks = verify_landmarks(landmarks, domain, problem)
+    verified_landmarks = verify_landmarks(landmarks, planning_graph, domain, problem)
 
 
     # Compute disjunctive landmarks using the verified landmarks
@@ -54,7 +54,7 @@ end
 
 
 
-function verify_landmarks(landmarks::Set{Landmark}, domain::Domain, problem::Problem)
+function verify_landmarks(landmarks::Set{Landmark}, planning_graph::PlanningGraph ,domain::Domain, problem::Problem)
 
     # Initialize state and specification
     state = initstate(domain, problem)
@@ -66,7 +66,7 @@ function verify_landmarks(landmarks::Set{Landmark}, domain::Domain, problem::Pro
     for landmark in landmarks
         # Remove preconditions of landmark from the delete list of the total action list.
         # This is done by creating a new domain with the modified delete lists
-        domain = modify_domain(domain, landmark)
+        domain = modify_domain(domain, landmark, planning_graph)
 
         # Run planner
         sol = planner(domain, state, spec)
@@ -93,16 +93,40 @@ function compute_disjunctive_landmarks(landmarks::Set{Landmark}, domain::Domain,
 
 end
 
-function modify_domain(domain::Domain, landmark::Landmark)
+function modify_domain(domain::Domain, landmark::Landmark, planning_graph::PlanningGraph)
 
     # Create new domain
     new_domain = deepcopy(domain)
 
+    landmark_preconditions = Set()
+    for landmark_precondtion in planning_graph.act_parents[landmark.facts.var]
+        push!(landmark_preconditions, landmark_precondition)
+    end
+
     # Modify delete lists of actions
     for action in new_domain.actions
-        delete!(action.delete_list, landmark.preconditions)
+        for (i, precond) in enumerate(action.preconditions)
+            if precond == landmark_preconditions
+                delete!(action.preconditions, i)
+                break
+            end
+        end
     end
 
     return new_domain
 
 end
+
+# function modify_domain(domain::Domain, landmark::Landmark)
+
+#     # Create new domain
+#     new_domain = deepcopy(domain)
+
+#     # Modify delete lists of actions
+#     for action in new_domain.actions
+#         delete!(action.delete_list, landmark.preconditions)
+#     end
+
+#     return new_domain
+
+# end
