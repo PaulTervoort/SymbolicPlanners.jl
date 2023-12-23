@@ -22,4 +22,5 @@ stats = @timed begin
 end
 # @test is_goal(spec, domain, sol.trajectory[end])
 println("Landmark extraction finished in ", stats.time, " seconds")
+println("Number of landmarks: ", length(landmarks))
 

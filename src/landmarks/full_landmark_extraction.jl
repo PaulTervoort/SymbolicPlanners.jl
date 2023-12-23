@@ -34,12 +34,12 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
 
     # Compute disjunctive landmarks using the verified landmarks
 
-    disjuctive_landmarks = compute_disjunctive_landmarks(verified_landmarks, domain, problem)
+    # disjuctive_landmarks = compute_disjunctive_landmarks(verified_landmarks, domain, problem)
 
     
     # Compute dependency orders of landmarks
 
-    verified_landmarks = union!(verified_landmarks, disjuctive_landmarks)
+    # verified_landmarks = union!(verified_landmarks, disjuctive_landmarks)
 
     return verified_landmarks
     
@@ -54,19 +54,23 @@ end
 
 
 
-function verify_landmarks(landmarks::Set{Landmark}, planning_graph::PlanningGraph ,domain::Domain, problem::Problem)
+function verify_landmarks(landmarks::Set{Landmark}, planning_graph::PlanningGraph, domain::Domain, problem::Problem)
 
     # Initialize state and specification
-    state = initstate(domain, problem)
+    
     spec = Specification(problem)
 
     # Initialize planner
     planner = AStarPlanner(HAdd(), save_search=true)
 
+    initial_domain = domain
+
     for landmark in landmarks
         # Remove preconditions of landmark from the delete list of the total action list.
         # This is done by creating a new domain with the modified delete lists
         domain = modify_domain(domain, landmark, planning_graph)
+
+        state = initstate(domain, problem)
 
         # Run planner
         sol = planner(domain, state, spec)
@@ -78,6 +82,8 @@ function verify_landmarks(landmarks::Set{Landmark}, planning_graph::PlanningGrap
             # A solution was found, meaning current landmark is not a landmark in the domain
             delete!(landmarks, landmark)
         end
+
+        domain = initial_domain
 
     end
 
@@ -95,38 +101,41 @@ end
 
 function modify_domain(domain::Domain, landmark::Landmark, planning_graph::PlanningGraph)
 
-    # Create new domain
-    new_domain = deepcopy(domain)
+    
+    new_actions = Set{Symbol}()
 
-    landmark_preconditions = Set()
-    for landmark_precondtion in planning_graph.act_parents[landmark.facts.var]
-        push!(landmark_preconditions, landmark_precondition)
+    # Find all actions that dont add the landmark
+
+    for fact in landmark.facts
+        # Retrieve the name of the action e.g. "stack"
+        curr_action = planning_graph.actions[fact.var].name
+        push!(new_actions, curr_action)
     end
 
-    # Modify delete lists of actions
-    for action in new_domain.actions
-        for (i, precond) in enumerate(action.preconditions)
-            if precond == landmark_preconditions
-                delete!(action.preconditions, i)
-                break
+    # for action in domain.actions
+    #     # Get name of action 
+    #     if action.first in new_actions
+    #         continue
+    #     else
+    #         # Remove all the delete actions (negative effects) by checking if a negation is happening
+    #         filter!(x -> x.name != Symbol("not"), action.second.effect.args)
+    #     end
+    # end
+
+    # Go over add list of actions. If the landmark is in the add list, remove the delete list from that action
+    for curr_action in new_actions
+
+        # Go over all actions in the domain
+        for action in domain.actions
+            # Get name of actions in actions add list
+            action_names = map(x -> x.name, action.second.effect.args)
+            if curr_action in action_names
+                filter!(x -> x.name != Symbol("not"), action.second.effect.args)
             end
         end
     end
 
-    return new_domain
+
+    return domain
 
 end
-
-# function modify_domain(domain::Domain, landmark::Landmark)
-
-#     # Create new domain
-#     new_domain = deepcopy(domain)
-
-#     # Modify delete lists of actions
-#     for action in new_domain.actions
-#         delete!(action.delete_list, landmark.preconditions)
-#     end
-
-#     return new_domain
-
-# end
