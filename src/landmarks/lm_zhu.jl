@@ -1,5 +1,4 @@
-
-include("pgraph.jl")
+export compute_propagation
 
 mutable struct graph_node
   labels::Set{Int}
@@ -183,5 +182,3 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
 
   return prop_layer
 end
-
-include("pgraph.jl")

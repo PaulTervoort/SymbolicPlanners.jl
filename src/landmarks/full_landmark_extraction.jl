@@ -17,7 +17,7 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
     end
 
     # Propagate landmarks
-    propagated_landmarks = propagate_landmarks(landmark_graph)
+    propagated_landmarks = compute_propagation(planning_graph)
 
     # Merge initial and propagated landmarks
     # landmarks = union!(landmarks, propagated_landmarks)
