@@ -16,11 +16,15 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
         push!(landmarks, landmark_node.landmark)    
     end
 
+    println("Amount of landmarks found in landmark graph: ", length(landmarks))
+
     # Propagate landmarks
-    propagated_landmarks = compute_propagation(planning_graph)
+    propagated_landmarks = propagate_landmarks(planning_graph, domain, start_state)
+
+    println("Amount of landmarks found in propagation: ", length(propagated_landmarks))
 
     # Merge initial and propagated landmarks
-    # landmarks = union!(landmarks, propagated_landmarks)
+    landmarks = union!(landmarks, propagated_landmarks)
 
 
 
@@ -47,8 +51,21 @@ end
 
 
 
-function propagate_landmarks(landmark_graph::LandmarkGraph)
+function propagate_landmarks(planning_graph::PlanningGraph, domain::Domain, state::State)
 
+    zhu_landmarks = graph_label(planning_graph, domain, state)
+
+    propagated_landmarks = Set{Landmark}()
+    
+    for landmark in zhu_landmarks
+        current_facts = Vector{FactPair}()
+        for fact in landmark.labels
+            push!(current_facts, FactPair(fact, 1))
+        end
+        push!(propagated_landmarks, Landmark(current_facts, (length(current_facts) > 1 ? true : false), false, true, false, Set{}(), Set{}()))
+    end
+
+    return propagated_landmarks
 end
 
 
@@ -76,7 +93,7 @@ function verify_landmarks(landmarks::Set{Landmark}, planning_graph::PlanningGrap
         sol = planner(domain, state, spec)
 
         # If no solution is found then it is a landmark
-        if sol.status == -1
+        if sol.status != -1
             continue
         else
             # A solution was found, meaning current landmark is not a landmark in the domain
@@ -108,19 +125,10 @@ function modify_domain(domain::Domain, landmark::Landmark, planning_graph::Plann
 
     for fact in landmark.facts
         # Retrieve the name of the action e.g. "stack"
-        curr_action = planning_graph.actions[fact.var].name
+        curr_action = planning_graph.conditions[fact.var].name
         push!(new_actions, curr_action)
     end
 
-    # for action in domain.actions
-    #     # Get name of action 
-    #     if action.first in new_actions
-    #         continue
-    #     else
-    #         # Remove all the delete actions (negative effects) by checking if a negation is happening
-    #         filter!(x -> x.name != Symbol("not"), action.second.effect.args)
-    #     end
-    # end
 
     # Go over add list of actions. If the landmark is in the add list, remove the delete list from that action
     for curr_action in new_actions
@@ -130,6 +138,8 @@ function modify_domain(domain::Domain, landmark::Landmark, planning_graph::Plann
             # Get name of actions in actions add list
             action_names = map(x -> x.name, action.second.effect.args)
             if curr_action in action_names
+                continue 
+            else 
                 filter!(x -> x.name != Symbol("not"), action.second.effect.args)
             end
         end

@@ -6,7 +6,7 @@ println("Started")
 
 # Load Blocksworld domain and single problem
 domain = load_domain(:blocksworld)
-problem = load_problem(:blocksworld, "problem-2")
+problem = load_problem(:blocksworld, "problem-1")
 # Initialize state
 state = initstate(domain, problem)
 spec = Specification(problem)
