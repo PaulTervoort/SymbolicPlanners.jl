@@ -2,8 +2,8 @@ using Debugger, PDDL, PlanningDomains, SymbolicPlanners
 
 
 function loadProblem(n)
-domain = load_domain(n)
-problem = load_problem(n, "problem-1")
+domain = load_domain("Hiking/domain.pddl")
+problem = load_problem("Hiking/problem-6.pddl")
 state = initstate(domain, problem)
 
 
@@ -17,5 +17,5 @@ sol = planner(domain, state, spec)
 return sol
 end
 
-@enter loadProblem(:blocksworld)
+@enter loadProblem(:doors_keys_gems)
 

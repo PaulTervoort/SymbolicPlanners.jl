@@ -6,16 +6,6 @@ mutable struct graph_node
   graph_node() = new()
 end
 
-# function deepcopy(node::graph_node)
-#  new_node = graph_node()
-#  new_node.labels = deepcopy(node.labels)
-#  return new_node
-# end
-
-# function deepcopy_vector(vec::Vector{graph_node})
-#  return [deepcopy(node) for node in vec]
-# end
-
 function compute_propagation(pgraph::PlanningGraph)
   triggers = Vector{Vector{Int}}()
 
@@ -35,26 +25,21 @@ function compute_propagation(pgraph::PlanningGraph)
   return triggers
 end
 
-function effect_empty(layer::Vector{graph_node}, effect::Vector{Int})
-  for cond in effect
-    if(isempty(layer[cond].labels))
+"Check if the preconditions are not empty."
+function check_precond_empty(layer::Vector{graph_node}, precond::Vector{Vector{Int}})
+  for conditions in precond
+    flag = false
+    for cond in conditions 
+      if(!isempty(layer[cond].labels))
+        flag = true
+      end
+    end
+    if(!flag)
       return false
     end
   end
   return true
 end
-
-function precond_empty(layer::Vector{graph_node}, precond::Vector{Vector{Int}})
-  for outer in precond
-    for cond in outer
-      if (isempty(layer[cond].labels))
-        return false
-      end
-    end
-  end
-  return true
-end
-
 
 function apply_action_and_propagate(layer::Vector{graph_node}, pgraph::PlanningGraph, action::Int, next_layer::Vector{graph_node}, triggers::Vector{Vector{Int}})
   result = Set{Int}()
@@ -62,17 +47,24 @@ function apply_action_and_propagate(layer::Vector{graph_node}, pgraph::PlanningG
   precond_union = union_preconditions(layer, pgraph.act_parents[action])
 
   for effect in pgraph.act_children[action]
-    precond_effect = copy(precond_union)
-    union_eff = union(precond_effect, effect)
 
-    union_effects = union_effect(layer, pgraph.act_children[action])
-    union!(precond_effect, union_effects)
+    eff_lbl_size = length(next_layer[effect].labels)
 
-    if (labels_propagated(next_layer[effect].labels, precond_effect, effect)) 
-      push!(result, effect)
-      next_layer[effect].labels = union_eff
+    if (eff_lbl_size == 1)
+      continue
     end
 
+    # precond_effect = copy(precond_union)
+    # union_eff = union(precond_effect, effect)
+
+    # union_effects = union_effect(layer, pgraph.act_children[action])
+    # union!(precond_effect, union_effects)
+
+    if (labels_propagated(next_layer[effect].labels, precond_union, effect)) 
+      push!(result, effect)
+      union_eff = union(precond_union, effect)
+      next_layer[effect].labels = union_eff
+    end
   end
 
   return result
@@ -150,11 +142,11 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
       # precond::Vector{Vector{Int}}
       precond = pgraph.act_parents[i]
 
-      if (precond_empty(prop_layer, precond))
+      if (check_precond_empty(prop_layer, precond))
          
         changed = apply_action_and_propagate(prop_layer, pgraph, i, next_layer, triggers)
         if (!isempty(changed))
-          
+        
           changes = true
           for j in changed
             for val in triggers[j]
@@ -183,5 +175,19 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
 
   return prop_layer
 end
+
+function extract_lm(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
+
+  for goal in  
+
+  end
+  
+
+
+
+
+
+end
+
 
 include("pgraph.jl")
