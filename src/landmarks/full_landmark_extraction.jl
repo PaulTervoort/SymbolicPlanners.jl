@@ -7,7 +7,7 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
     spec = Specification(problem)
 
     # Compute landmark graph
-    (landmark_graph, planning_graph) = compute_landmark_graph(domain, start_state, spec)
+    (landmark_graph, generation_data)= compute_landmark_graph(domain, start_state, spec)
     
     # Extract landmarks from landmark graph
     landmarks = Set{Landmark}()
@@ -16,36 +16,35 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
         push!(landmarks, landmark_node.landmark)    
     end
 
-    println("Amount of landmarks found in landmark graph: ", length(landmarks))
+    # println("Amount of landmarks found in landmark graph: ", length(landmarks))
+
+    planning_graph = generation_data.planning_graph
 
     # Propagate landmarks
-    propagated_landmarks = propagate_landmarks(planning_graph, domain, start_state)
+    zhu_landmarks = propagate_landmarks(planning_graph, domain, start_state)
 
-    println("Amount of landmarks found in propagation: ", length(propagated_landmarks))
+    # println("Amount of landmarks found in propagation: ", length(propagated_landmarks))
 
     # Merge initial and propagated landmarks
-    landmarks = union!(landmarks, propagated_landmarks)
+    merged_landmarks = merge_landmarks(landmarks, zhu_landmarks)
+
+    # println("Amount of landmarks found after merging: ", length(landmarks))
 
 
-
+    # VERIFICATION IS NOW DONE WHEN GENERATING LANDMARKS
 
     # Verify that all nodes are actual landmarks
     # Landmarks are verified by checking if the goals are reachable if the landmark is removed from the delete list of the actions leading to them
     # If the goals are reachable, the landmark is not a landmark and is removed from the set of landmarks
     # If the goals are not reachable, the landmark is a landmark and is added to the set of landmarks
-    verified_landmarks = verify_landmarks(landmarks, planning_graph, domain, problem)
+    # verified_landmarks = verify_landmarks(landmarks, planning_graph, domain, problem)
 
 
     # Compute disjunctive landmarks using the verified landmarks
 
     # disjuctive_landmarks = compute_disjunctive_landmarks(verified_landmarks, domain, problem)
 
-    
-    # Compute dependency orders of landmarks
-
-    # verified_landmarks = union!(verified_landmarks, disjuctive_landmarks)
-
-    return verified_landmarks
+    return (merged_landmarks, landmarks, zhu_landmarks)
     
 end
 
@@ -68,6 +67,28 @@ function propagate_landmarks(planning_graph::PlanningGraph, domain::Domain, stat
     return propagated_landmarks
 end
 
+function merge_landmarks(landmarks::Set{Landmark}, propagated_landmarks::Set{Landmark})
+
+    merged_facts = Set{Vector{FactPair}}()
+
+    merged_landmarks = Set{Landmark}()
+
+    for landmark in landmarks
+        push!(merged_facts, landmark.facts)
+        push!(merged_landmarks, landmark)
+    end
+
+    for landmark in propagated_landmarks
+        if landmark.facts in merged_facts
+            continue
+        else
+            push!(merged_facts, landmark.facts)
+            push!(merged_landmarks, landmark)
+        end
+    end
+
+    return merged_landmarks
+end
 
 
 
@@ -109,12 +130,6 @@ function verify_landmarks(landmarks::Set{Landmark}, planning_graph::PlanningGrap
 end
 
 
-# Need to wait for paper to include this
-function compute_disjunctive_landmarks(landmarks::Set{Landmark}, domain::Domain, problem::Problem) 
-
-    
-
-end
 
 function modify_domain(domain::Domain, landmark::Landmark, planning_graph::PlanningGraph)
 
