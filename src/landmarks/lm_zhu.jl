@@ -1,4 +1,5 @@
 export compute_propagation
+export zhu_givan_landmark_extraction
 
 mutable struct graph_node
   labels::Set{Int}
@@ -160,17 +161,63 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
     triggered = next_trigger
   end
 
-  n_action = length(pgraph.actions)
- 
-  res = Set{Int}()
+  return prop_layer
+end
 
-  for out in pgraph.act_parents[n_action]
-    for i in out
-      for j in prop_layer[i].labels
-      push!(res, j)
+function extract_lm(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
+  n_action = length(pgraph.actions)
+  n_goals = pgraph.n_goals
+
+  goals = pgraph.act_parents[n_action]
+
+  propagated_landmarks = Set{Landmark}()
+  landmark_graph::LandmarkGraph = LandmarkGraph(0, 0, Dict(), Dict(), [])
+
+  for goal in goals
+    for condition in goal
+      goalpair::FactPair = FactPair(condition, 1)
+
+      lm_node = nothing
+      if (landmark_graph_contains_landmark(landmark_graph, goalpair))
+        lm_node = landmark_graph.simple_landmarks_to_nodes[goalpair]
+        lm_node.landmark.is_true_in_goal = true
+      else
+        fact_vector = Vector{FactPair}()
+        push!(fact_vector, goalpair)
+        lm = Landmark(fact_vector, false, false, true, false, Set{}(), Set{}())
+        lm_node = landmark_graph_add_landmark(landmark_graph, lm)
+      end
+
+      for label in prop_layer[condition].labels
+        if(label == condition)
+          continue
+        end
+
+        node = nothing
+        factpair::FactPair = FactPair(label, 1)
+        if (!landmark_graph_contains_landmark(landmark_graph, factpair))
+          fact_vector = Vector{FactPair}()
+          push!(fact_vector, factpair)
+          lm = Landmark(fact_vector, false, false, false, false, Set{}(), Set{}())
+          node = landmark_graph_add_landmark(landmark_graph, lm)
+        else
+          node = landmark_graph.simple_landmarks_to_nodes[factpair]
+        end
+
+        edge_add(node, lm_node, NATURAL)
       end
     end
   end
+  return landmark_graph
+end
 
-  return prop_layer
+function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
+  initial_state = initstate(domain, problem)
+  spec = Specification(problem)
+
+  statics = infer_static_fluents(domain)
+  pgraph = build_planning_graph(domain, initial_state, spec, statics = statics)
+  label_graph = graph_label(pgraph, domain , initial_state)
+  landmark_graph = extract_lm(label_graph, pgraph)
+  return landmark_graph
 end
