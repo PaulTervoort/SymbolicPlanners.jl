@@ -6,26 +6,38 @@ println("Started")
 
 results = Vector{Tuple{String, Tuple{Set, Set, Set}}}()
 
-for i in 1:9
-    println("Iteration: ", i)
-    # Load Blocksworld domain and single problem
-    domain = load_domain(:blocksworld)
-    problem = load_problem(:blocksworld, "problem-$(i)")
-    # Initialize state
+blocksworld = [1, 11, 15, 22, 29, 36, 43, 50, 57, 64, 71, 78, 85, 92, 99]
+
+freecell = [26, 27, 28, 31, 32, 33, 36, 37, 38, 41, 42, 43, 46, 47, 48]
+
+DOMAIN_NAME = "blocksworld"
+
+for i in blocksworld
+    println("Problem number: ", i)
+    
+    ## Load domain and problem ##
+    domain_dir = joinpath(@__DIR__, "logical", DOMAIN_NAME)
+    domain = load_domain(joinpath(domain_dir, "domain.pddl"))
+    problem = load_problem(joinpath(domain_dir, "instance-$(i).pddl"))
+
+    ## Initialize state and specification ##
     state = initstate(domain, problem)
     spec = Specification(problem)
 
-    # Add our planner here
-    planner = AStarPlanner(HAdd(), save_search=true)
+    ## Initialize planner ##
+    planner = OrderedLandmarksPlanner()
 
     ## Run Planner ##
 
     stats = @timed begin
         full_landmarks = full_landmark_extraction(domain, problem)
     end
+
+    ## Print results ##
     println("Full landmark extraction finished in ", stats.time, " seconds")
     println("Number of landmarks: ", length(full_landmarks[1]))
 
+    ## Add results for plotting ##
     push!(results, ("bw-$(i)", full_landmarks))
 end
 
@@ -56,4 +68,4 @@ function plot_results(results::Vector{Tuple{String, Tuple{Set, Set, Set}}}, doma
     savefig(p, "$(domain_name)-full_extraction.png")
 end
 
-plot_results(results, "Blocksworld")
+plot_results(results, DOMAIN_NAME)

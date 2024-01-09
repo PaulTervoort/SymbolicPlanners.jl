@@ -23,6 +23,8 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
     # Propagate landmarks
     zhu_landmarks = propagate_landmarks(planning_graph, domain, start_state)
 
+    # zhu_landmarks = verify_landmarks(zhu_landmarks, planning_graph, domain, problem)
+
     # println("Amount of landmarks found in propagation: ", length(propagated_landmarks))
 
     # Merge initial and propagated landmarks
@@ -114,7 +116,7 @@ function verify_landmarks(landmarks::Set{Landmark}, planning_graph::PlanningGrap
         sol = planner(domain, state, spec)
 
         # If no solution is found then it is a landmark
-        if sol.status != -1
+        if sol.status == -1
             continue
         else
             # A solution was found, meaning current landmark is not a landmark in the domain
