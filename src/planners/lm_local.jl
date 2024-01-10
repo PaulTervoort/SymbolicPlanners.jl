@@ -23,6 +23,10 @@ function solve(planner::LMLocalPlanner,
     @unpack lm_graph, p_graph, internal_planner = planner
     @unpack h_mult, heuristic, save_search = internal_planner
     saved_lm_graph = deepcopy(lm_graph)
+
+    for (idx, lm) in enumerate(lm_graph.nodes)
+        lm.id = idx
+    end
     
     # Simplify goal specification
     spec = simplify_goal(spec, domain, state)
@@ -46,33 +50,66 @@ function solve(planner::LMLocalPlanner,
 
         sources = get_sources(lm_graph)
         if (length(sources) == 0) break end
-        # For each next up LM compute plan to get there, take shortest and add to final solution
+
+        # Create Conjunctive goals of sources
+        lm_id_to_terms::Dict{Int, Term} = Dict()
+        simple_nr_to_term::Dict{Int, Term} = Dict()
+        for (idx, lm) in enumerate(sources)
+            term = landmark_to_terms(lm.landmark, p_graph)
+            lm_id_to_terms[lm.id] = Compound(:and, term)
+            simple_nr_to_term[idx] = Compound(:and, term)
+        end
+
+        # Create compatibiliity matrix for all possible upcoming terms (Can they be achievea at the same time).
+        nr_sources = length(sources)
+        compat_mat = trues(nr_sources, nr_sources)
+        for i in 1:nr_sources
+            for j in i+1:nr_sources
+                compat_mat[i,j] = PDDL.satisfy(domain, state, [simple_nr_to_term[i], simple_nr_to_term[j]])
+            end
+        end
+
+        # Create Conjunctive Goals based on compatibiliity matrix
+        used::Set{Int} = Set()
+        goal_terms::Vector{Term} = Vector()
+        for i in 1:nr_sources
+            if i in used continue end
+            for j in 1:nr_sources
+                if compat_mat[i,j]
+                    push!(goal_terms, simple_nr_to_term[j])
+                    push!(used, j)
+                end
+            end
+        end
+
+        # For each next up Goal compute plan to get there, take shortest and add to final solution
         shortest_sol = nothing
-        used_lm = nothing
         used_planner = nothing
-        # TODO evaluate NECESSARY edges first and only those if they exist (Speed up performance)
-        for lm in sources
+        for goal in goal_terms
             # Copy planner so we dont get side effects
             copy_planner = deepcopy(internal_planner)
             sub_sol = deepcopy(sol)
-            inter_spec = Specification(landmark_to_terms(lm.landmark, p_graph))
+            inter_spec = Specification(goal)
             sub_sol.status = :in_progress
             sub_sol = search!(sub_sol, copy_planner, domain, inter_spec)
             if isnothing(shortest_sol) 
                 shortest_sol = sub_sol 
-                used_lm = lm
                 used_planner = copy_planner
             elseif length(sub_sol.trajectory) < length(shortest_sol.trajectory)
                 shortest_sol = sub_sol
-                used_lm = lm
                 used_planner = copy_planner
             end
         end
-        landmark_graph_remove_occurences(lm_graph, used_lm)
-        landmark_graph_remove_node(lm_graph, used_lm)    
         # Update internal_planner and sol
         internal_planner = used_planner
         sol = shortest_sol
+        # Find LM that was solved and remove it from LM graph
+        for lm in sources
+            if is_goal(Specification(lm_id_to_terms[lm.id]), domain, sol.trajectory[end])
+                landmark_graph_remove_occurences(lm_graph, lm)
+                landmark_graph_remove_node(lm_graph, lm)
+            end
+        end
     end
     sol.status = :in_progress
     sol = search!(sol, internal_planner, domain, spec)
@@ -109,7 +146,7 @@ function get_sources(lm_graph::LandmarkGraph) :: Set{LandmarkNode}
     return res
 end
 
-function landmark_to_terms(lm::Landmark, p_graph::PlanningGraph) :: AbstractVector{<:Term}
+function landmark_to_terms(lm::Landmark, p_graph::PlanningGraph) :: Vector{Term}
     res::Vector{Term} = Vector()
     for fact_p :: FactPair in lm.facts
         if fact_p.value == 1
