@@ -24,10 +24,23 @@ function solve(planner::LMLocalPlanner,
     @unpack h_mult, heuristic, save_search = internal_planner
     saved_lm_graph = deepcopy(lm_graph)
 
+    # Generate Terms for each Landmark
+    lm_id_to_terms::Dict{Int, Term} = Dict()
     for (idx, lm) in enumerate(lm_graph.nodes)
         lm.id = idx
+        term = landmark_to_terms(lm.landmark, p_graph)
+        lm_id_to_terms[lm.id] = Compound(:and, term)
     end
     
+    # Create compatibility Matrix for all terms/landmarks
+    nr_nodes = length(lm_graph.nodes)
+    compat_mat = trues(nr_nodes, nr_nodes)
+    for i in 1:nr_nodes
+        for j in i+1:nr_nodes
+            compat_mat[i,j] = PDDL.satisfy(domain, state, [lm_id_to_terms[i], lm_id_to_terms[j]])
+        end
+    end
+
     # Simplify goal specification
     spec = simplify_goal(spec, domain, state)
     # Precompute heuristic information
@@ -51,35 +64,19 @@ function solve(planner::LMLocalPlanner,
         sources = get_sources(lm_graph)
         if (length(sources) == 0) break end
 
-        # Create Conjunctive goals of sources
-        lm_id_to_terms::Dict{Int, Term} = Dict()
-        simple_nr_to_term::Dict{Int, Term} = Dict()
-        for (idx, lm) in enumerate(sources)
-            term = landmark_to_terms(lm.landmark, p_graph)
-            lm_id_to_terms[lm.id] = Compound(:and, term)
-            simple_nr_to_term[idx] = Compound(:and, term)
-        end
-
-        # Create compatibiliity matrix for all possible upcoming terms (Can they be achievea at the same time).
-        nr_sources = length(sources)
-        compat_mat = trues(nr_sources, nr_sources)
-        for i in 1:nr_sources
-            for j in i+1:nr_sources
-                compat_mat[i,j] = PDDL.satisfy(domain, state, [simple_nr_to_term[i], simple_nr_to_term[j]])
-            end
-        end
-
-        # Create Conjunctive Goals based on compatibiliity matrix
+        # Create Conjunctive Goals based on compatibiliity matrix and current sources
         used::Set{Int} = Set()
-        goal_terms::Vector{Term} = Vector()
-        for i in 1:nr_sources
-            if i in used continue end
-            for j in 1:nr_sources
-                if compat_mat[i,j]
-                    push!(goal_terms, simple_nr_to_term[j])
-                    push!(used, j)
+        goal_terms::Vector{Vector{Term}} = Vector()
+        for i in sources
+            if i.id in used continue end
+            goal = Vector()
+            for j in sources
+                if compat_mat[i.id,j.id]
+                    push!(goal, lm_id_to_terms[j.id])
+                    push!(used, j.id)
                 end
             end
+            push!(goal_terms, goal)
         end
 
         # For each next up Goal compute plan to get there, take shortest and add to final solution
