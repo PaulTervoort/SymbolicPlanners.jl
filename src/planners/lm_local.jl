@@ -37,10 +37,13 @@ function solve(planner::LMLocalPlanner,
     compat_mat = trues(nr_nodes, nr_nodes)
     for i in 1:nr_nodes
         for j in i+1:nr_nodes
-            compat_mat[i,j] = PDDL.satisfy(domain, state, [lm_id_to_terms[i], lm_id_to_terms[j]])
+            sat = PDDL.satisfy(domain, state, Compound(:and, [lm_id_to_terms[i], lm_id_to_terms[j]]))
+            compat_mat[i,j] = sat
+            compat_mat[j,i] = sat
         end
     end
 
+    println(compat_mat)
     # Simplify goal specification
     spec = simplify_goal(spec, domain, state)
     # Precompute heuristic information
@@ -82,7 +85,9 @@ function solve(planner::LMLocalPlanner,
         # For each next up Goal compute plan to get there, take shortest and add to final solution
         shortest_sol = nothing
         used_planner = nothing
+        println("New Goals")
         for goal in goal_terms
+            println(goal)
             # Copy planner so we dont get side effects
             copy_planner = deepcopy(internal_planner)
             sub_sol = deepcopy(sol)
