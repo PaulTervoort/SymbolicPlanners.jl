@@ -1,9 +1,9 @@
-export LMLocalPlanner
+export LMLocalSmartPlanner
 
 """
 """
 
-@kwdef mutable struct LMLocalPlanner <: Planner
+@kwdef mutable struct LMLocalSmartPlanner <: Planner
     # Landmark Graph that is used to generate intermediary goals
     lm_graph::LandmarkGraph
     # Planning graph to match the LM graph
@@ -16,15 +16,18 @@ export LMLocalPlanner
     max_mem::Float64 = Inf
 end
 
-function LMLocalPlanner(lm_graph::LandmarkGraph, gen_data::LandmarkGenerationData, internal_planner::Planner, max_time::Float64)
-    return LMLocalPlanner(lm_graph, gen_data, internal_planner, max_time, Inf)
+function LMLocalSmartPlanner(lm_graph::LandmarkGraph, gen_data::LandmarkGenerationData, internal_planner::Planner, max_time::Float64)
+    return LMLocalSmartPlanner(lm_graph, gen_data, internal_planner, max_time, Inf)
 end
 
-function solve(planner::LMLocalPlanner,
+function solve(planner::LMLocalSmartPlanner,
                 domain::Domain, state::State, spec::Specification)
     @unpack lm_graph, gen_data, internal_planner = planner
     @unpack h_mult, heuristic, save_search = internal_planner
     p_graph = gen_data.planning_graph
+    #TODO not remove edges
+    remove_reasonable_edges(lm_graph)
+    remove_natural_edges(lm_graph)
     saved_lm_graph = deepcopy(lm_graph)
 
     # Generate Terms for each Landmark
@@ -40,7 +43,8 @@ function solve(planner::LMLocalPlanner,
     compat_mat = trues(nr_nodes, nr_nodes)
     for i in 1:nr_nodes
         for j in i+1:nr_nodes
-            sat = interferes(lm_graph.nodes[i].landmark, lm_graph.nodes[j].landmark, gen_data)
+            # sat = interferes(lm_graph.nodes[i].landmark, lm_graph.nodes[j].landmark, gen_data)
+            sat = PDDL.satisfy(domain, state, Compound(:and, [lm_id_to_terms[i], lm_id_to_terms[j]]))
             compat_mat[i,j] = sat
             compat_mat[j,i] = sat
         end
@@ -64,9 +68,12 @@ function solve(planner::LMLocalPlanner,
             sol.status = :max_time # Time budget reached
             return sol
         end
-
+        
         sources = get_sources(lm_graph)
-        if (length(sources) == 0) break end
+        if (length(sources) == 0) 
+            println("No new sources")
+            break 
+        end
 
         # Create Conjunctive Goals based on compatibiliity matrix and current sources
         used::Set{Int} = Set()
@@ -86,9 +93,7 @@ function solve(planner::LMLocalPlanner,
         # For each next up Goal compute plan to get there, take shortest and add to final solution
         shortest_sol = nothing
         used_planner = nothing
-        println("New Goals")
         for goal in goal_terms
-            println(goal)
             # Copy planner so we dont get side effects
             copy_planner = deepcopy(internal_planner)
             sub_sol = deepcopy(sol)
@@ -130,11 +135,16 @@ function solve(planner::LMLocalPlanner,
     end
 end
 
-function remove_reasonable_and_natural_edges(lm_graph::LandmarkGraph)
+function remove_reasonable_edges(lm_graph::LandmarkGraph)
     for lm in lm_graph.nodes
         for (child, edge) in lm.children
             if edge == REASONABLE || edge == NATURAL delete!(lm.children, child) end
         end
+    end
+end
+
+function remove_natural_edges(lm_graph::LandmarkGraph)
+    for lm in lm_graph.nodes
         for (parent, edge) in lm.parents
             if edge == REASONABLE || edge == NATURAL delete!(lm.parents, parent) end
         end
