@@ -21,7 +21,7 @@ approximate_reasonable_orders(lm_graph, gen_data)
 # end
 
 # Add our planner here
-planner = LMLocalPlanner(lm_graph, gen_data.planning_graph, AStarPlanner(HAdd(), save_search=true), 180.0)
+planner = LMLocalPlanner(lm_graph, gen_data, AStarPlanner(HAdd(), save_search=true), 180.0)
 # planner = AStarPlanner(LMCount(lm_graph, gen_data.planning_graph), max_time=180.0, save_search=true)
 ## Run Planner ##
 

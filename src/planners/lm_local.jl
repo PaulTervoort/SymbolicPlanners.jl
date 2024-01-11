@@ -7,7 +7,7 @@ export LMLocalPlanner
     # Landmark Graph that is used to generate intermediary goals
     lm_graph::LandmarkGraph
     # Planning graph to match the LM graph
-    p_graph::PlanningGraph
+    gen_data::LandmarkGenerationData
     # Planner used to solve the problem
     internal_planner::Planner
     # Max timout in seconds
@@ -16,14 +16,15 @@ export LMLocalPlanner
     max_mem::Float64 = Inf
 end
 
-function LMLocalPlanner(lm_graph::LandmarkGraph, p_graph::PlanningGraph, internal_planner::Planner, max_time::Float32)
-    return LMLocalPlanner(lm_graph, p_graph, internal_planner, max_time)
+function LMLocalPlanner(lm_graph::LandmarkGraph, gen_data::LandmarkGenerationData, internal_planner::Planner, max_time::Float64)
+    return LMLocalPlanner(lm_graph, gen_data, internal_planner, max_time, Inf)
 end
 
 function solve(planner::LMLocalPlanner,
                 domain::Domain, state::State, spec::Specification)
-    @unpack lm_graph, p_graph, internal_planner = planner
+    @unpack lm_graph, gen_data, internal_planner = planner
     @unpack h_mult, heuristic, save_search = internal_planner
+    p_graph = gen_data.planning_graph
     saved_lm_graph = deepcopy(lm_graph)
 
     # Generate Terms for each Landmark
@@ -39,13 +40,11 @@ function solve(planner::LMLocalPlanner,
     compat_mat = trues(nr_nodes, nr_nodes)
     for i in 1:nr_nodes
         for j in i+1:nr_nodes
-            sat = PDDL.satisfy(domain, state, Compound(:and, [lm_id_to_terms[i], lm_id_to_terms[j]]))
+            sat = interferes(lm_graph.nodes[i].landmark, lm_graph.nodes[j].landmark, gen_data)
             compat_mat[i,j] = sat
             compat_mat[j,i] = sat
         end
     end
-
-    println(compat_mat)
     # Simplify goal specification
     spec = simplify_goal(spec, domain, state)
     # Precompute heuristic information
@@ -155,6 +154,8 @@ function landmark_to_terms(lm::Landmark, p_graph::PlanningGraph) :: Vector{Term}
     for fact_p :: FactPair in lm.facts
         if fact_p.value == 1
             push!(res, p_graph.conditions[fact_p.var])
+        else 
+            push!(res, Compound(:not, [p_graph.conditions[fact_p.var]]))
         end
     end
     return res

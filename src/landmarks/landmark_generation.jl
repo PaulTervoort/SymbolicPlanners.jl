@@ -9,6 +9,8 @@ export approximate_reasonable_orders
 export landmark_graph_remove_cycles_fast
 export landmark_graph_remove_cycles_complete
 export landmark_graph_remove_initial_state
+export interferes
+export LandmarkGenerationData
 
 
 mutable struct Proposition

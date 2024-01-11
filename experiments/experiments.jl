@@ -50,7 +50,7 @@ for d_name in list_domains(JuliaPlannersRepo)
             elseif planner_name == "LM_Count"
                 planner = AStarPlanner(LMCount(deepcopy(lm_graph), gen_data.planning_graph), max_time=TIMEOUT, save_search=true)
             elseif planner_name == "LM_Local-HAdd"
-                planner = LMLocalPlanner(deepcopy(lm_graph), gen_data.planning_graph, AStarPlanner(HAdd(), save_search=true), TIMEOUT)
+                planner = LMLocalPlanner(deepcopy(lm_graph), gen_data, AStarPlanner(HAdd(), save_search=true), TIMEOUT)
             end
 
             nruns = dom isa CompiledDomain ? NRUNS + 1 : NRUNS
