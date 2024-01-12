@@ -31,7 +31,10 @@ function solve(planner::LMLocalSmartPlanner,
     lm_id_to_terms::Dict{Int, Term} = Dict()
     for (idx, lm) in enumerate(lm_graph.nodes)
         lm.id = idx
-        term = landmark_to_terms(lm.landmark, p_graph)
+        term = p_graph.conditions[first(lm.landmark.facts).var] #landmark_to_terms(lm.landmark, p_graph)
+        if first(lm.landmark.facts).value == 0
+            term = Compound(:not, [term])
+        end
         lm_id_to_terms[lm.id] = term
     end
     
@@ -53,7 +56,7 @@ function solve(planner::LMLocalSmartPlanner,
     # Initialize search tree and priority queue
     node_id = hash(state)
     search_tree = Dict(node_id => PathNode(node_id, state, 0.0))
-    est_cost::Float32 = h_mult * compute(heuristic, domain, state, spec)
+    est_cost = h_mult * compute(heuristic, domain, state, spec)
     priority = (est_cost, est_cost, 0)
     queue = PriorityQueue(node_id => priority)
     search_order = UInt[]
@@ -72,19 +75,37 @@ function solve(planner::LMLocalSmartPlanner,
             break 
         end
 
-        # Create Conjunctive Goals based on compatibiliity matrix and current sources
-        used::Set{Int} = Set()
-        goal_terms::Vector{Vector{Term}} = Vector()
+        goal_nodes::Vector{Set{LandmarkNode}} = Vector()
         for i in sources
-            if i.id in used continue end
-            goal = Vector()
-            for j in sources
-                if compat_mat[i.id,j.id]
-                    push!(goal, lm_id_to_terms[j.id])
-                    push!(used, j.id)
+            new_gs = []
+            added = false
+            for g in goal_nodes
+                g_new = filter(n -> compat_mat[i.id, n.id], g)
+                if length(g) == length(g_new)
+                    added = true
+                    push!(g, i)
+                elseif length(g_new) > 0
+                    added = true
+                    push!(g_new, i)
+                    isnew = true
+                    for ng in new_gs
+                        if issetequal(ng, g_new)
+                            isnew = false
+                        end
+                    end
+                    if isnew
+                        push!(new_gs, g_new)
+                    end
                 end
             end
-            push!(goal_terms, goal)
+            if !added
+                push!(goal_nodes, Set([i]))
+            end
+            append!(goal_nodes, new_gs)
+        end
+        goal_terms = map(s -> map(n -> lm_id_to_terms[n.id], collect(s)), goal_nodes)
+        if  length(goal_nodes) > length(sources) * 0.5 #arbitrary factor chosen
+            goal_terms = map(n -> [lm_id_to_terms[n.id]], collect(sources))
         end
 
         # For each next up Goal compute plan to get there, take shortest and add to final solution
@@ -116,8 +137,17 @@ function solve(planner::LMLocalSmartPlanner,
             end
         end
     end
-    sol.status = :in_progress
-    sol = search!(sol, internal_planner, domain, spec)
+    node_id = hash(sol.trajectory[end])
+    search_tree = Dict(node_id => PathNode(node_id, sol.trajectory[end], 0.0))
+    est_cost::Float32 = h_mult * compute(heuristic, domain, sol.trajectory[end], spec)
+    priority = (est_cost, est_cost, 0)
+    queue = PriorityQueue(node_id => priority)
+    search_order = UInt[]
+    sol2 = PathSearchSolution(:in_progress, Term[], Vector{typeof(state)}(), 0, search_tree, queue, search_order)
+    sol2 = search!(sol2, internal_planner, domain, spec)
+    append!(sol.plan, sol2.plan)
+    append!(sol.trajectory, sol2.trajectory)
+    sol.expanded += sol2.expanded
 
     # Reset internal LM Graph to prevent not using landmarks in subsequent runs
     planner.lm_graph = saved_lm_graph
@@ -131,4 +161,3 @@ function solve(planner::LMLocalSmartPlanner,
         return PathSearchSolution(sol.status, sol.plan, sol.trajectory)
     end
 end
-
