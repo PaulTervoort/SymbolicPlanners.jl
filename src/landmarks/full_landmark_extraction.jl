@@ -16,14 +16,8 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
         push!(landmarks, landmark_node.landmark)    
     end
 
-    # println("Amount of landmarks found in landmark graph: ", length(landmarks))
-
-    planning_graph = generation_data.planning_graph
-
     # Propagate landmarks
-    zhu_landmarks = propagate_landmarks(planning_graph, domain, start_state)
-
-    # zhu_landmarks = verify_landmarks(zhu_landmarks, planning_graph, domain, problem)
+    zhu_landmarks = propagate_landmarks(domain, problem)
 
     # println("Amount of landmarks found in propagation: ", length(propagated_landmarks))
 
@@ -52,20 +46,16 @@ end
 
 
 
-function propagate_landmarks(planning_graph::PlanningGraph, domain::Domain, state::State)
+function propagate_landmarks(domain::Domain, problem::Problem)
 
-    zhu_landmarks = graph_label(planning_graph, domain, state)
+    zhu_landmarks = zhu_givan_landmark_extraction(domain, problem)
 
     propagated_landmarks = Set{Landmark}()
-    
-    for landmark in zhu_landmarks
-        current_facts = Vector{FactPair}()
-        for fact in landmark.labels
-            push!(current_facts, FactPair(fact, 1))
-        end
-        push!(propagated_landmarks, Landmark(current_facts, (length(current_facts) > 1 ? true : false), false, true, false, Set{}(), Set{}()))
-    end
 
+    for landmark_node in zhu_landmarks.nodes
+        push!(propagated_landmarks, landmark_node.landmark)    
+    end
+    
     return propagated_landmarks
 end
 
