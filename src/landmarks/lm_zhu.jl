@@ -104,7 +104,7 @@ function union_effect(layer::Vector{graph_node}, effect::Vector{Int})
   return result
 end
 
-function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
+function create_graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
 
   n_conditions = length(pgraph.conditions)
   triggers = compute_propagation(pgraph)
@@ -163,7 +163,7 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
   return prop_layer
 end
 
-function extract_lm(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
+function create_lm_graph(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
   n_action = length(pgraph.actions)
 
   goals = pgraph.act_parents[n_action]
@@ -212,10 +212,10 @@ function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
 
   statics = infer_static_fluents(domain)
   pgraph = build_planning_graph(domain, initial_state, spec, statics = statics)
-  label_graph = graph_label(pgraph, domain , initial_state)
-  landmark_graph = extract_lm(label_graph, pgraph)
+  label_graph = create_graph_label(pgraph, domain , initial_state)
+  landmark_graph = create_lm_graph(label_graph, pgraph)
 
-  println("amount of lm before verification:", length(landmark_graph.nodes))
+  # println("amount of lm before verification:", length(landmark_graph.nodes))
 
   term_index = Dict(map(reverse, enumerate(pgraph.conditions)))
   init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
@@ -225,7 +225,7 @@ function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
   generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair)
   discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
 
-  println("amount of lm after verification:", length(landmark_graph.nodes))
+  # println("amount of lm after verification:", length(landmark_graph.nodes))
 
   return landmark_graph
 end
