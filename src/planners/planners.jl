@@ -80,6 +80,7 @@ include("bidirectional.jl")
 
 # Landmark planners
 include("lm_local.jl")
+include("lm_local_smart.jl")
 
 # Policy-based planning algorithms
 include("rtdp.jl")

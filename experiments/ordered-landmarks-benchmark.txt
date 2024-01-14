@@ -10,12 +10,22 @@ Grid
  - prob04 = logical/grid/instance-4.pddl
  - prob05 = logical/grid/instance-5.pddl
 Logistics
+ - prob-4-0 (extra) = logical/logistics/instance-1.pddl
+ - prob-6-0 (extra) = logical/logistics/instance-7.pddl
+ - prob-8-0 (extra) = logical/logistics/instance-13.pddl
+ - prob-10-0 (extra) = logical/logistics/instance-17.pddl
+ - prob-12-0 (extra) = logical/logistics/instance-21.pddl
+ - prob-14-0 (extra) = logical/logistics/instance-25.pddl
  - prob-38-0 = logical/logistics/instance-77.pddl
  - prob-39-0 = logical/logistics/instance-79.pddl
  - prob-40-0 = logical/logistics/instance-81.pddl
  - prob-41-0 = logical/logistics/instance-83.pddl
 Tyreworld
  - fixit-1 = logical/tireworld/pfile1.pddl
+ - fixit-2 (extra) = logical/tireworld/pfile2.pddl
+ - fixit-3 (extra) = logical/tireworld/pfile3.pddl
+ - fixit-4 (extra) = logical/tireworld/pfile4.pddl
+ - fixit-5 (extra) = logical/tireworld/pfile5.pddl
  - fixit-10 = logical/tireworld/pfile10.pddl
  - fixit-20 = logical/tireworld/pfile20.pddl
  - fixit-30 = logical/tireworld/pfile30.pddl

@@ -5,11 +5,10 @@ using DataFrames, CSV, Dates, Statistics
 println("Started")
 println()
 
-# planners = ["FF", "LM_Count", "LM_Local-FF"]
-planners = ["FF", "LM_Local-FF"]
+planners = ["FF", "LM_Count", "LM_Local-FF"]
 benchmark_file = "ordered-landmarks-benchmark.txt"
 
-TIMEOUT = 180.0
+TIMEOUT = 300.0
 MAX_MEMORY = 7000000000.0
 NRUNS = 4
 
@@ -70,13 +69,16 @@ for (d_name::String, d_path::String) in domains
         lm_graph = nothing
         p_graph = nothing
         i_state = nothing
+        gen_data = nothing
         if !isnothing(rg)
             lm_graph = rg.first
-            p_graph = rg.second.planning_graph
-            i_state = rg.second.initial_state
+            gen_data = rg.second
+            p_graph = gen_data.planning_graph
+            i_state = gen_data.initial_state
 
             landmark_graph_remove_initial_state(lm_graph, i_state)
-            approximate_reasonable_orders(lm_graph, rg.second)
+            generate_mutex_lookup(gen_data, TIMEOUT)
+            approximate_reasonable_orders(lm_graph, gen_data)
         end
 
         # Solve using all planners
@@ -97,9 +99,14 @@ for (d_name::String, d_path::String) in domains
                     planner = AStarPlanner(LMCount(lm_graph, p_graph), max_time=TIMEOUT, max_mem=MAX_MEMORY, save_search=true)
                 elseif planner_name == "LM_Local-FF" && !isnothing(lm_graph)
                     graphcopy = deepcopy(lm_graph)
-                    landmark_graph_remove_cycles_complete(graphcopy)
+                    no_cycles = landmark_graph_remove_cycles_complete(graphcopy, TIMEOUT)
                     lm_num = length(graphcopy.nodes)
-                    planner = LMLocalPlanner(graphcopy, p_graph, AStarPlanner(FFHeuristic(), max_time=TIMEOUT, max_mem=MAX_MEMORY, save_search=true), TIMEOUT, MAX_MEMORY)
+                    if no_cycles
+                        planner = LMLocalSmartPlanner(graphcopy, gen_data, AStarPlanner(FFHeuristic(), max_time=15, max_mem=MAX_MEMORY, save_search=true), TIMEOUT, MAX_MEMORY)
+                        landmark_graph_draw_png(joinpath(@__DIR__, "test.png"), graphcopy, p_graph)
+                    else
+                        planner = nothing
+                    end
                 else
                     continue
                 end
