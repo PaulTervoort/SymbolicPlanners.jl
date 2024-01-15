@@ -117,6 +117,7 @@ function solve(planner::LMLocalSmartPlanner,
         # For each next up Goal compute plan to get there, take shortest and add to final solution
         shortest_sol = nothing
         used_planner = nothing
+        most_sources_true = 0
         first_early = false
         for goal in goal_terms
             # Copy planner so we dont get side effects
@@ -140,29 +141,40 @@ function solve(planner::LMLocalSmartPlanner,
                     first_early = true
                 else
                     for lm in lm_graph.nodes
-                        if !(lm in sources) &&is_goal(Specification(lm_id_to_terms[lm.id]), domain, sub_sol.trajectory[end])
-                            first_early = true
-                            break
+                        if is_goal(Specification(lm_id_to_terms[lm.id]), domain, sub_sol.trajectory[end])
+                            if lm in sources
+                                most_sources_true += 1
+                            else
+                                first_early = true
+                                break
+                            end
                         end
                     end
                 end
                 shortest_sol = sub_sol 
                 used_planner = copy_planner
-            elseif length(sub_sol.trajectory) < length(shortest_sol.trajectory) || first_early
+            else
                 early_lm = false
+                sources_true = 0
                 if sub_sol.status == :max_time
                     early_lm = true
                 else
                     for lm in lm_graph.nodes
-                        if !(lm in sources) &&is_goal(Specification(lm_id_to_terms[lm.id]), domain, sub_sol.trajectory[end])
-                            early_lm = true
-                            break
+                        if is_goal(Specification(lm_id_to_terms[lm.id]), domain, sub_sol.trajectory[end])
+                            if lm in sources
+                                sources_true += 1
+                            else
+                                early_lm = true
+                                break
+                            end
                         end
                     end
                 end
-                if !early_lm
+                if (!early_lm || (first_early && early_lm)) && (length(sub_sol.trajectory) < length(shortest_sol.trajectory) || (sources_true > most_sources_true && length(sub_sol.trajectory) == length(shortest_sol.trajectory)))
+                    first_early = early_lm
                     shortest_sol = sub_sol
                     used_planner = copy_planner
+                    most_sources_true = sources_true
                 end
             end
         end

@@ -9,6 +9,7 @@ planners = ["FF", "LM_Count", "LM_Local-FF"]
 benchmark_file = "ordered-landmarks-benchmark.txt"
 
 TIMEOUT = 450.0
+MUTEX_TIMEOUT = 600.0
 MAX_MEMORY = 7000000000.0
 NRUNS = 4
 
@@ -77,7 +78,7 @@ for (d_name::String, d_path::String) in domains
             i_state = gen_data.initial_state
 
             landmark_graph_remove_initial_state(lm_graph, i_state)
-            generate_mutex_lookup(gen_data, TIMEOUT)
+            generate_mutex_lookup(gen_data, MUTEX_TIMEOUT)
             approximate_reasonable_orders(lm_graph, gen_data)
         end
 
@@ -122,12 +123,12 @@ for (d_name::String, d_path::String) in domains
                     stats = @timed begin
                         sol = planner(cdomain, cstate, spec)
                     end
-                    if !is_goal(spec, domain, GenericState(sol.trajectory[end]))
+                    if length(sol.trajectory) == 0 || !is_goal(spec, domain, GenericState(sol.trajectory[end]))
                         println("no valid solution", )
                     end
-                    timed_out = sol.status == :max_time && i != 1
-                    n_steps = sol.status == :max_time ? -1 : length(sol.plan)
-                    time = sol.status == :max_time ? -1.0 : stats.time
+                    timed_out = sol.status == :max_time
+                    n_steps = timed_out ? -1 : length(sol.plan)
+                    time = timed_out ? -1.0 : stats.time
                     bytes = stats.bytes
                     n_eval = length(sol.search_tree)
                     n_expand = sol.expanded
