@@ -173,7 +173,7 @@ function solve(planner::LMLocalSmartPlanner,
         internal_planner = used_planner
         sol = shortest_sol
         state = sol.trajectory[end]
-        println("state: $(GenericState(state).facts)")
+        # println("state: $(GenericState(state).facts)")
         # Find LM that was solved and remove it from LM graph
         for lm in sources
             # println("lm: $(lm_id_to_terms[lm.id]), true? $(lm_id_to_terms[lm.id] in GenericState(state).facts)")

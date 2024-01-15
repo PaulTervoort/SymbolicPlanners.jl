@@ -8,7 +8,7 @@ println()
 planners = ["FF", "LM_Count", "LM_Local-FF"]
 benchmark_file = "ordered-landmarks-benchmark.txt"
 
-TIMEOUT = 300.0
+TIMEOUT = 450.0
 MAX_MEMORY = 7000000000.0
 NRUNS = 4
 
