@@ -61,6 +61,9 @@ function solve(planner::LMLocalSmartPlanner,
     queue = PriorityQueue(node_id => priority)
     search_order = UInt[]
     sol = PathSearchSolution(:in_progress, Term[], Vector{typeof(state)}(), 0, search_tree, queue, search_order)
+    plan = Term[]
+    trajectory = Vector{typeof(state)}()
+    expanded = 0
 
     start_time = time()
     time_factor = 1
@@ -173,6 +176,10 @@ function solve(planner::LMLocalSmartPlanner,
         internal_planner = used_planner
         sol = shortest_sol
         state = sol.trajectory[end]
+
+        append!(trajectory, sol.trajectory[1:end-1])
+        append!(plan, sol.plan)
+        expanded += sol.expanded
         # println("state: $(GenericState(state).facts)")
         # Find LM that was solved and remove it from LM graph
         for lm in sources
@@ -191,9 +198,12 @@ function solve(planner::LMLocalSmartPlanner,
     search_order = UInt[]
     sol2 = PathSearchSolution(:in_progress, Term[], Vector{typeof(state)}(), 0, search_tree, queue, search_order)
     sol2 = search!(sol2, internal_planner, domain, spec)
-    append!(sol.plan, sol2.plan)
-    append!(sol.trajectory, sol2.trajectory)
-    sol.expanded += sol2.expanded
+    append!(plan, sol2.plan)
+    sol.plan = plan
+    append!(trajectory, sol2.trajectory)
+    sol.trajectory = trajectory
+    expanded += sol2.expanded
+    sol.expanded = expanded
 
     # Reset internal LM Graph to prevent not using landmarks in subsequent runs
     planner.lm_graph = saved_lm_graph
