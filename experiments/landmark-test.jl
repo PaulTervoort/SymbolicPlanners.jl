@@ -22,36 +22,28 @@ problem = load_problem(joinpath(domain_dir, "instance-$INSTANCE.pddl"))
 # problem = load_problem(joinpath(@__DIR__, "logical", "freecell", "instance-26.pddl"))
 # domain = load_domain(joinpath(@__DIR__, "logical", "grid", "domain.pddl"))
 # problem = load_problem(joinpath(@__DIR__, "logical", "grid", "instance-1.pddl"))
+# domain = load_domain(joinpath(@__DIR__, "logical", "tireworld", "domain.pddl"))
+# problem = load_problem(joinpath(@__DIR__, "logical", "tireworld", "pfile1.pddl"))
+# domain = load_domain(joinpath(@__DIR__, "logical", "logistics", "domain.pddl"))
+# problem = load_problem(joinpath(@__DIR__, "logical", "logistics", "instance-77.pddl"))
+# domain = load_domain(joinpath(@__DIR__, "logical", "prodigy-bw", "domain.pddl"))
+# problem = load_problem(joinpath(@__DIR__, "logical", "prodigy-bw", "bw-large-a.pddl"))
 
 state = initstate(domain, problem)
 spec = Specification(problem)
-planner = OrderedLandmarksPlanner()
+planner = AStarPlanner(HAdd(), save_search=true)
 
 ## Experimental code ##
 
 # g = compute_landmark_graph(domain, state, spec)
 
 rg = compute_relaxed_landmark_graph(domain, state, spec)
+landmark_graph_remove_initial_state(rg.first, rg.second.initial_state)
 approximate_reasonable_orders(rg.first, rg.second)
+landmark_graph_remove_cycles_complete(rg.first)
 
-import SymbolicPlanners.LandmarkNode, SymbolicPlanners.EdgeType, SymbolicPlanners.FactPair
-
-function factpair_to_term(factpair::FactPair) :: Term
-    effect::Term = rg.second.planning_graph.conditions[factpair.var]
-    if factpair.value == 0
-        effect = Compound(:not, [effect])
-    end
-    return effect
-end
-
-node_lookup::Dict{LandmarkNode, Int} = Dict(map(reverse, enumerate(rg.first.nodes)))
-for node::Tuple{Int, LandmarkNode} in enumerate(rg.first.nodes)
-    println("Landmark $(node[1]) ($(factpair_to_term(first(node[2].landmark.facts))))")
-    for child::Pair{LandmarkNode, EdgeType} in node[2].children
-        println("    Edge to $(node_lookup[child.first]) - $(child.second)")
-    end
-end
-println()
+landmark_graph_print(rg.first, rg.second.planning_graph)
+landmark_graph_draw_png(joinpath(@__DIR__, "test.png"), rg.first, rg.second.planning_graph)
 
 ## Verification ##
 
