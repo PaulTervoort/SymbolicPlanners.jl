@@ -8,17 +8,15 @@ results = Vector{Tuple{String, Tuple{Set, Set, Set}}}()
 
 blocksworld = [1, 11, 15, 22, 29, 36, 43, 50, 57, 64, 71, 78, 85, 92, 99]
 
-freecell = [26, 27, 28, 31, 32, 33, 36, 37, 38, 41, 42, 43, 46, 47, 48]
-
 grid = [1, 2, 3, 4, 5]
 
 logistics = [1, 9, 18, 21, 27, 34, 41, 49, 55, 60, 64, 68, 71, 75, 82]
 
 miconic = [4, 11, 23, 31, 42, 57, 65, 73, 84, 97, 106, 115, 121, 133, 146]
 
-DOMAIN_NAME = "logistics"
+DOMAIN_NAME = "grid"
 
-for i in logistics
+for i in grid
     println("Problem number: ", i)
     
     ## Load domain and problem ##
@@ -32,8 +30,10 @@ for i in logistics
 
     ## Run Landmark Extraction ##
 
-    maxTime = 300
-    stats = timedwait(full_landmark_extraction(domain, problem), maxTime)
+    maxTime = 120.0
+    stats = @timed begin 
+        full_landmark_extraction(domain, problem, maxTime)
+    end
 
     ## Print results ##
     println("Full landmark extraction finished in ", stats.time, " seconds")

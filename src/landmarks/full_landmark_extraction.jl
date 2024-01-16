@@ -1,6 +1,6 @@
 export full_landmark_extraction
 
-function full_landmark_extraction(domain::Domain, problem::Problem)
+function full_landmark_extraction(domain::Domain, problem::Problem, timeout::Float64)
     
     # Initialize state and specification
     start_state = initstate(domain, problem)
@@ -8,8 +8,8 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
 
     compiled_domain, compiled_state = compiled(domain, start_state)
     # Compute landmark graph
-    (landmark_graph, generation_data)= compute_landmark_graph(domain, start_state, spec)
-    # (landmark_graph, generation_data)= compute_relaxed_landmark_graph(compiled_domain, compiled_state, spec)
+    # (landmark_graph, generation_data)= compute_landmark_graph(domain, start_state, spec)
+    (landmark_graph, generation_data)= compute_relaxed_landmark_graph(domain, start_state, spec, timeout)
     
     # Extract landmarks from landmark graph
     landmarks = Set{Landmark}()
