@@ -937,7 +937,7 @@ function generate_mutex_lookup(generation_data::LandmarkGenerationData, max_time
             end
             for fact2::FactPair in keys(generation_data.mutexes)
                 if fact1 != fact2 && !(fact2 in generation_data.mutexes[fact1])
-                    if is_mutex(fact1, fact2, generation_data)
+                    if (round(passes / 2) == 2) ? is_mutex(fact1, fact2, generation_data) : is_mutex_fast(fact1, fact2, generation_data)
                         push!(generation_data.mutexes[fact1], fact2)
                         push!(generation_data.mutexes[fact2], fact1)
                         num_mutex += 1
@@ -999,6 +999,71 @@ function approximate_reasonable_orders(landmark_graph::LandmarkGraph, generation
     landmark_graph_set_landmark_ids(landmark_graph)
 end
 
+function is_mutex_fast(fact_a::FactPair, fact_b::FactPair, generation_data::LandmarkGenerationData)
+    if fact_a.var == fact_b.var
+        return fact_a.value != fact_b.value
+    end
+    if fact_a in get(generation_data.mutexes, fact_b, Set())
+        return true
+    end
+
+    a_init::Bool = fact_in_init(fact_a, generation_data)
+    a_true::Bool = a_init && fact_can_delete(fact_a, generation_data)
+    b_init::Bool = fact_in_init(fact_b, generation_data)
+    b_true::Bool = b_init && fact_can_delete(fact_b, generation_data)
+    if a_true && b_true
+        return false
+    end
+
+    term_a::Term = generation_data.planning_graph.conditions[fact_a.var]
+    if fact_a.value == 0
+        term_a = Compound(:not, [term_a])
+    end
+    term_b::Term = generation_data.planning_graph.conditions[fact_b.var]
+    if fact_b.value == 0
+        term_b = Compound(:not, [term_b])
+    end
+
+    op_ids_a::Vector{Int} = get(generation_data.planning_graph.effect_map, term_a, [])
+    if length(op_ids_a) == 0 && !a_true
+        return true
+    end
+    op_ids_b::Vector{Int} = get(generation_data.planning_graph.effect_map, term_b, [])
+    if length(op_ids_b) == 0 && !b_true
+        return true
+    end
+
+    for op_id::Int in op_ids_a
+        if !fact_false_after_op(fact_b, op_id, generation_data) || b_init
+            return false
+        end
+    end
+    for op_id::Int in op_ids_b
+        if !fact_false_after_op(fact_a, op_id, generation_data) || a_init
+            return false
+        end
+    end
+    return true
+end
+
+function fact_in_init(fact::FactPair, generation_data::LandmarkGenerationData) :: Bool
+    for init_fact::FactPair in generation_data.initial_state
+        if init_fact.var == fact.var
+            return init_fact.value == fact.value
+        end
+    end
+    return fact.value == 0
+end
+
+
+function fact_can_delete(fact::FactPair, generation_data::LandmarkGenerationData) :: Bool
+    complement::Term = generation_data.planning_graph.conditions[fact.var]
+    if fact.value == 1
+        complement = Compound(:not, [complement])
+    end
+    return length(get(generation_data.planning_graph.effect_map, complement, [])) == 0
+end
+
 function is_mutex(fact_a::FactPair, fact_b::FactPair, generation_data::LandmarkGenerationData)
     if fact_a.var == fact_b.var
         return fact_a.value != fact_b.value
@@ -1009,9 +1074,9 @@ function is_mutex(fact_a::FactPair, fact_b::FactPair, generation_data::LandmarkG
 
     a_true::Bool = fact_always_true(fact_a, generation_data)
     b_true::Bool = fact_always_true(fact_b, generation_data)
-    # if a_true && b_true
-    #     return false
-    # end
+    if a_true && b_true
+        return false
+    end
 
     term_a::Term = generation_data.planning_graph.conditions[fact_a.var]
     if fact_a.value == 0
@@ -1115,7 +1180,7 @@ function is_mutex(fact_a::FactPair, fact_b::FactPair, generation_data::LandmarkG
 end
 
 function fact_always_true(fact::FactPair, generation_data::LandmarkGenerationData) :: Bool
-    in_init::Bool = fact.value == 0
+    in_init::Bool = (fact.value == 0)
     for init_fact::FactPair in generation_data.initial_state
         if init_fact.var == fact.var
             if init_fact.value == fact.value
@@ -1177,7 +1242,7 @@ function fact_false_after_op(fact::FactPair, op_id::Int, generation_data::Landma
         if eff == fact
             return false
         end
-        if (eff.var == fact.var && eff.value != fact.value) || fact in get(generation_data.mutexes, eff, Set()) # Or if mutex(eff, fact), but inf recursion
+        if (eff.var == fact.var && eff.value != fact.value) || fact in get(generation_data.mutexes, eff, Set())
             return true
         end
     end

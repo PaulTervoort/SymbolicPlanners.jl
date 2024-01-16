@@ -80,38 +80,36 @@ function solve(planner::LMLocalSmartPlanner,
             break 
         end
 
-        goal_nodes::Vector{Set{LandmarkNode}} = Vector()
-        for i in sources
-            new_gs = []
-            added = false
-            for g in goal_nodes
-                g_new = filter(n -> compat_mat[i.id, n.id], g)
-                if length(g) == length(g_new)
-                    added = true
-                    push!(g, i)
-                elseif length(g_new) > 0
-                    added = true
-                    push!(g_new, i)
-                    isnew = true
-                    for ng in new_gs
-                        if issetequal(ng, g_new)
-                            isnew = false
-                        end
-                    end
-                    if isnew
-                        push!(new_gs, g_new)
-                    end
-                end
-            end
-            if !added
-                push!(goal_nodes, Set([i]))
-            end
-            append!(goal_nodes, new_gs)
-        end
-        goal_terms = map(s -> map(n -> lm_id_to_terms[n.id], collect(s)), goal_nodes)
-        if  length(goal_nodes) > length(sources) * 0.5 #arbitrary factor chosen
-            goal_terms = map(n -> [lm_id_to_terms[n.id]], collect(sources))
-        end
+        # goal_nodes::Vector{Set{LandmarkNode}} = Vector()
+        # for i in sources
+        #     new_gs = []
+        #     added = false
+        #     for g in goal_nodes
+        #         g_new = filter(n -> compat_mat[i.id, n.id], g)
+        #         if length(g) == length(g_new)
+        #             added = true
+        #             push!(g, i)
+        #         elseif length(g_new) > 0
+        #             added = true
+        #             push!(g_new, i)
+        #             isnew = true
+        #             for ng in new_gs
+        #                 if issetequal(ng, g_new)
+        #                     isnew = false
+        #                 end
+        #             end
+        #             if isnew
+        #                 push!(new_gs, g_new)
+        #             end
+        #         end
+        #     end
+        #     if !added
+        #         push!(goal_nodes, Set([i]))
+        #     end
+        #     append!(goal_nodes, new_gs)
+        # end
+        # goal_terms = map(s -> map(n -> lm_id_to_terms[n.id], collect(s)), goal_nodes)
+        goal_terms = map(n -> [lm_id_to_terms[n.id]], collect(sources))
         println("goals: $goal_terms")
 
         # For each next up Goal compute plan to get there, take shortest and add to final solution
@@ -141,13 +139,18 @@ function solve(planner::LMLocalSmartPlanner,
                     first_early = true
                 else
                     for lm in lm_graph.nodes
-                        if is_goal(Specification(lm_id_to_terms[lm.id]), domain, sub_sol.trajectory[end])
-                            if lm in sources
-                                most_sources_true += 1
-                            else
-                                first_early = true
+                        for goal in sub_sol.trajectory
+                            if is_goal(Specification(lm_id_to_terms[lm.id]), domain, goal)
+                                if lm in sources
+                                    most_sources_true += 1
+                                else
+                                    first_early = true
+                                end
                                 break
                             end
+                        end
+                        if first_early
+                            break
                         end
                     end
                 end
@@ -160,17 +163,22 @@ function solve(planner::LMLocalSmartPlanner,
                     early_lm = true
                 else
                     for lm in lm_graph.nodes
-                        if is_goal(Specification(lm_id_to_terms[lm.id]), domain, sub_sol.trajectory[end])
-                            if lm in sources
-                                sources_true += 1
-                            else
-                                early_lm = true
+                        for goal in sub_sol.trajectory
+                            if is_goal(Specification(lm_id_to_terms[lm.id]), domain, goal)
+                                if lm in sources
+                                    sources_true += 1
+                                else
+                                    early_lm = true
+                                end
                                 break
                             end
                         end
+                        if early_lm
+                            break
+                        end
                     end
                 end
-                if (!early_lm || (first_early && early_lm)) && (length(sub_sol.trajectory) < length(shortest_sol.trajectory) || (sources_true > most_sources_true && length(sub_sol.trajectory) == length(shortest_sol.trajectory)))
+                if (!early_lm || (first_early && early_lm)) && (sources_true > most_sources_true || (sources_true == most_sources_true && length(sub_sol.trajectory) < length(shortest_sol.trajectory)))
                     first_early = early_lm
                     shortest_sol = sub_sol
                     used_planner = copy_planner
@@ -195,10 +203,11 @@ function solve(planner::LMLocalSmartPlanner,
         # println("state: $(GenericState(state).facts)")
         # Find LM that was solved and remove it from LM graph
         for lm in sources
-            # println("lm: $(lm_id_to_terms[lm.id]), true? $(lm_id_to_terms[lm.id] in GenericState(state).facts)")
-            if is_goal(Specification(lm_id_to_terms[lm.id]), domain, sol.trajectory[end])
-                landmark_graph_remove_occurences(lm_graph, lm)
-                landmark_graph_remove_node(lm_graph, lm)
+            for goal in sol.trajectory
+                if is_goal(Specification(lm_id_to_terms[lm.id]), domain, goal)
+                    landmark_graph_remove_occurences(lm_graph, lm)
+                    landmark_graph_remove_node(lm_graph, lm)
+                end
             end
         end
     end
