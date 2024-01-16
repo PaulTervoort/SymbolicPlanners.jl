@@ -44,10 +44,9 @@ end
 function apply_action_and_propagate(layer::Vector{graph_node}, pgraph::PlanningGraph, action::Int, next_layer::Vector{graph_node}, triggers::Vector{Vector{Int}})
   result = Set{Int}()
 
-  precond_union = union_preconditions(layer, pgraph.act_parents[action])
-
   for effect in pgraph.act_children[action]
 
+    precond_union = union_preconditions(layer, pgraph.act_parents[action])
     eff_lbl_size = length(next_layer[effect].labels)
 
     if (eff_lbl_size == 1)
@@ -105,7 +104,7 @@ function union_effect(layer::Vector{graph_node}, effect::Vector{Int})
   return result
 end
 
-function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
+function create_graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
 
   n_conditions = length(pgraph.conditions)
   triggers = compute_propagation(pgraph)
@@ -164,13 +163,11 @@ function graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
   return prop_layer
 end
 
-function extract_lm(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
+function create_lm_graph(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
   n_action = length(pgraph.actions)
-  n_goals = pgraph.n_goals
 
   goals = pgraph.act_parents[n_action]
 
-  propagated_landmarks = Set{Landmark}()
   landmark_graph::LandmarkGraph = LandmarkGraph(0, 0, Dict(), Dict(), [])
 
   for goal in goals
@@ -187,7 +184,6 @@ function extract_lm(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
         lm = Landmark(fact_vector, false, false, true, false, Set{}(), Set{}())
         lm_node = landmark_graph_add_landmark(landmark_graph, lm)
       end
-
       for label in prop_layer[condition].labels
         if(label == condition)
           continue
@@ -203,7 +199,6 @@ function extract_lm(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
         else
           node = landmark_graph.simple_landmarks_to_nodes[factpair]
         end
-
         edge_add(node, lm_node, NATURAL)
       end
     end
@@ -217,7 +212,20 @@ function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
 
   statics = infer_static_fluents(domain)
   pgraph = build_planning_graph(domain, initial_state, spec, statics = statics)
-  label_graph = graph_label(pgraph, domain , initial_state)
-  landmark_graph = extract_lm(label_graph, pgraph)
+  label_graph = create_graph_label(pgraph, domain , initial_state)
+  landmark_graph = create_lm_graph(label_graph, pgraph)
+
+  # println("amount of lm before verification:", length(landmark_graph.nodes))
+
+  term_index = Dict(map(reverse, enumerate(pgraph.conditions)))
+  init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
+  initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(s, 1), findall(init_idxs))
+
+  # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(term_index[s], 1), keys(initial_state))
+  generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair)
+  discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
+
+  # println("amount of lm after verification:", length(landmark_graph.nodes))
+
   return landmark_graph
 end
