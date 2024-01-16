@@ -134,7 +134,7 @@ function create_graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
   changes = true
 
   while(changes)
-    next_layer = deepcopy(prop_layer)
+    next_layer = copy(prop_layer)
     next_trigger = Set()
     changes = false
     for i in triggered
@@ -222,7 +222,7 @@ function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
   initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(s, 1), findall(init_idxs))
 
   # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(term_index[s], 1), keys(initial_state))
-  generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair)
+  generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair, Dict{FactPair, Set{FactPair}}())
   discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
 
   # println("amount of lm after verification:", length(landmark_graph.nodes))

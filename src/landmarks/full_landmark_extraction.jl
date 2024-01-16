@@ -8,9 +8,14 @@ function full_landmark_extraction(domain::Domain, problem::Problem, timeout::Flo
 
     compiled_domain, compiled_state = compiled(domain, start_state)
     # Compute landmark graph
-    # (landmark_graph, generation_data)= compute_landmark_graph(domain, start_state, spec)
-    (landmark_graph, generation_data)= compute_relaxed_landmark_graph(domain, start_state, spec, timeout)
-    
+    # (landmark_graph, generation_data) = compute_landmark_graph(domain, start_state, spec)
+    landmark_graph = LandmarkGraph(0, 0, Dict(), Dict(), [])
+    try 
+        (landmark_graph, generation_data) = compute_relaxed_landmark_graph(domain, start_state, spec, timeout)
+    catch nothing
+            return (Set{Landmark}(), Set{Landmark}(), Set{Landmark}())
+    end
+
     # Extract landmarks from landmark graph
     landmarks = Set{Landmark}()
 
