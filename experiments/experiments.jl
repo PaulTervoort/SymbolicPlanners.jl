@@ -101,11 +101,15 @@ for (d_name::String, d_path::String) in domains
                 elseif planner_name == "LM_Local-FF" && !isnothing(lm_graph)
                     graphcopy = deepcopy(lm_graph)
                     no_cycles = landmark_graph_remove_cycles_complete(graphcopy, TIMEOUT)
+                    if !no_cycles
+                        no_cycles = landmark_graph_remove_cycles_fast(graphcopy, TIMEOUT)
+                    end
                     lm_num = length(graphcopy.nodes)
                     if no_cycles
                         planner = LMLocalSmartPlanner(graphcopy, gen_data, AStarPlanner(FFHeuristic(), max_time=15, max_mem=MAX_MEMORY, save_search=true), TIMEOUT, MAX_MEMORY)
                         landmark_graph_draw_png(joinpath(@__DIR__, "test.png"), graphcopy, p_graph)
                     else
+                        println("Cycles not removed")
                         planner = nothing
                     end
                 else
@@ -123,15 +127,19 @@ for (d_name::String, d_path::String) in domains
                     stats = @timed begin
                         sol = planner(cdomain, cstate, spec)
                     end
+                    valid = true
                     if length(sol.trajectory) == 0 || !is_goal(spec, domain, GenericState(sol.trajectory[end]))
+                        valid = false
                         println("no valid solution", )
                     end
                     timed_out = sol.status == :max_time
-                    n_steps = timed_out ? -1 : length(sol.plan)
+                    n_steps = (timed_out || !valid) ? -1 : length(sol.plan)
                     time = timed_out ? -1.0 : stats.time
                     bytes = stats.bytes
                     n_eval = length(sol.search_tree)
                     n_expand = sol.expanded
+                else
+                    timed_out = true
                 end
 
                 # Save result

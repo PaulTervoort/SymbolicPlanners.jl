@@ -276,7 +276,7 @@ function compute_relaxed_landmark_graph(domain::Domain, state::State, spec::Spec
 
     open_landmarks::Queue{LandmarkNode} = Queue{LandmarkNode}()
     for fact::Term in spec.terms
-        fact_pair::Vector{FactPair} = [FactPair(term_index[fact], 1)]
+        fact_pair::Vector{FactPair} = [FactPair(generation_data.term_index[fact], 1)]
         landmark = Landmark(fact_pair, false, false, true, false, Set(), Set())
         lm_node = landmark_graph_add_landmark(landmark_graph, landmark)
         enqueue!(open_landmarks, lm_node)
@@ -323,11 +323,15 @@ function landmark_graph_remove_initial_state(landmark_graph::LandmarkGraph, init
     landmark_graph_set_landmark_ids(landmark_graph)
 end
 
-function landmark_graph_remove_cycles_fast(landmark_graph::LandmarkGraph)
+function landmark_graph_remove_cycles_fast(landmark_graph::LandmarkGraph, max_time::Float64 = Inf) :: Bool
     nodes_to_check::Set{LandmarkNode} = Set(landmark_graph.nodes)
+    end_time::Float64 = time() + max_time
     while !isempty(nodes_to_check)
         node::LandmarkNode = first(nodes_to_check)
-        cycle::Vector{LandmarkNode} = search_cycle(node, Set{LandmarkNode}())
+        cycle::Vector{LandmarkNode} = search_cycle(node, Set{LandmarkNode}(), end_time)
+        if time() > end_time
+            return false
+        end
         if isempty(cycle)
             delete!(nodes_to_check, node)
         else
@@ -347,16 +351,20 @@ function landmark_graph_remove_cycles_fast(landmark_graph::LandmarkGraph)
         end
     end
     landmark_graph_set_landmark_ids(landmark_graph)
+    return true
 end
 
-function search_cycle(node::LandmarkNode, trajectory::Set{LandmarkNode}) :: Vector{LandmarkNode}
+function search_cycle(node::LandmarkNode, trajectory::Set{LandmarkNode}, end_time::Float64) :: Vector{LandmarkNode}
     if node in trajectory
         return [node]
     end
     push!(trajectory, node)
 
     for child::LandmarkNode in keys(node.children)
-        cycle::Vector{LandmarkNode} = search_cycle(child, trajectory)
+        cycle::Vector{LandmarkNode} = search_cycle(child, trajectory, end_time)
+        if time() > end_time
+            return []
+        end
         if !isempty(cycle)
             if length(cycle) == 1 || last(cycle) != first(cycle)
                 push!(cycle, node)
@@ -753,6 +761,12 @@ function build_dtg_successors(generation_data::LandmarkGenerationData) :: Dict{I
         precondition_map::Dict{Int, Int} = Dict()
         for precondition::Term in op.preconds
             precondition_map[generation_data.term_index[precondition]] = 1
+        end
+        for eff::Term in op.effect.add
+            if !haskey(generation_data.term_index, eff)
+                push!(generation_data.planning_graph.conditions, eff)
+                generation_data.term_index[eff] = length(generation_data.planning_graph.conditions)
+            end
         end
 
         effects::Vector{FactPair} = map(t -> FactPair(generation_data.term_index[t], 1), op.effect.add)

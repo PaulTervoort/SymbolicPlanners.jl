@@ -120,7 +120,7 @@ function solve(planner::LMLocalSmartPlanner,
         for goal in goal_terms
             # Copy planner so we dont get side effects
             copy_planner = deepcopy(internal_planner)
-            copy_planner.max_time = min(timeout_bak * time_factor, planner.max_time + start_time - time())
+            copy_planner.max_time = min(min(timeout_bak, planner.max_time / (length(goal_terms) * (length(goal_terms) / 2))) * time_factor, planner.max_time + start_time - time())
             sub_sol = deepcopy(sol)
             inter_spec = Specification(goal)
             # Precompute heuristic information
@@ -154,6 +154,7 @@ function solve(planner::LMLocalSmartPlanner,
                         end
                     end
                 end
+                most_sources_true /= length(sub_sol.trajectory)
                 shortest_sol = sub_sol 
                 used_planner = copy_planner
             else
@@ -178,7 +179,8 @@ function solve(planner::LMLocalSmartPlanner,
                         end
                     end
                 end
-                if (!early_lm || (first_early && early_lm)) && (sources_true > most_sources_true || (sources_true == most_sources_true && length(sub_sol.trajectory) < length(shortest_sol.trajectory)))
+                sources_true /= length(sub_sol.trajectory)
+                if (!early_lm || (first_early && early_lm)) && sources_true > most_sources_true
                     first_early = early_lm
                     shortest_sol = sub_sol
                     used_planner = copy_planner
