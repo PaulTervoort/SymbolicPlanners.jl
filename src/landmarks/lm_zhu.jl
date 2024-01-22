@@ -1,37 +1,38 @@
-export compute_propagation
 export zhu_givan_landmark_extraction
 
-mutable struct graph_node
-  labels::Set{Int}
-  graph_node() = new()
-end
+"""
+    map_condition_action(pgraph)
 
-function compute_propagation(pgraph::PlanningGraph)
-  triggers = Vector{Vector{Int}}()
-
-  n_conditions = length(pgraph.conditions)
-  resize!(triggers, n_conditions)
+Generate a map of conditions to corresponding child action based on the planning graph.
+"""
+function map_condition_action(pgraph::PlanningGraph)
+  map = Vector{Vector{Int}}()
+  condition_size = length(pgraph.conditions)
+  resize!(map, condition_size)
 
   for (i, conditions) in enumerate(pgraph.cond_children)
-    triggers[i] = Vector{Int}()
+    map[i] = Vector{Int}()
 
     for tuple in conditions
-      idx_action, idx_precond = tuple
-
-      push!(triggers[i], idx_action)
+      idx_action = tuple[1]
+      push!(map[i], idx_action)
     end
   end
 
-  return triggers
+  return map 
 end
 
-"Check if the preconditions are not empty."
-function check_precond_empty(layer::Vector{graph_node}, precond::Vector{Vector{Int}})
-  for conditions in precond
+"""
+    check_precond_empty(label_layer, preconditions)
+
+Check if labels of the preconditions specified by 'preconditions' are non-empty in 'label_layer'.
+"""
+function check_precond_empty(label_layer::Vector{Set{Int}}, preconditions::Vector{Vector{Int}})
+  for conditions in preconditions
     flag = false
-    for cond in conditions 
-      if(!isempty(layer[cond].labels))
-        flag = true
+    for condition in conditions 
+      if !isempty(label_layer[condition])
+        flag = true 
       end
     end
     if(!flag)
@@ -41,140 +42,123 @@ function check_precond_empty(layer::Vector{graph_node}, precond::Vector{Vector{I
   return true
 end
 
-function apply_action_and_propagate(layer::Vector{graph_node}, pgraph::PlanningGraph, action::Int, next_layer::Vector{graph_node}, triggers::Vector{Vector{Int}})
+"""
+    apply_action_and_propagate(label_layer, next_label_layer, pgraph, action)
+
+Apply label propagation to the effects labels of action.
+"""
+function apply_action_and_propagate(label_layer::Vector{Set{Int}}, next_label_layer::Vector{Set{Int}}, pgraph::PlanningGraph, action::Int)
   result = Set{Int}()
+  union_set_preconditions = union_preconditions(label_layer, pgraph.act_parents[action])
 
   for effect in pgraph.act_children[action]
-
-    precond_union = union_preconditions(layer, pgraph.act_parents[action])
-    eff_lbl_size = length(next_layer[effect].labels)
-
-    if (eff_lbl_size == 1)
+    if length(next_label_layer[effect]) == 1
       continue
     end
 
-    # precond_effect = copy(precond_union)
-    # union_eff = union(precond_effect, effect)
+    union_set_preconditions_effect = union(union_set_preconditions, effect)
+    (propagated, new_labels) = check_propagation(next_label_layer[effect], union_set_preconditions_effect, effect)
+    next_label_layer[effect] = new_labels
 
-    # union_effects = union_effect(layer, pgraph.act_children[action])
-    # union!(precond_effect, union_effects)
-
-    if (labels_propagated(next_layer[effect].labels, precond_union, effect)) 
+    if propagated
       push!(result, effect)
-      union_eff = union(precond_union, effect)
-      next_layer[effect].labels = union_eff
     end
   end
 
   return result
 end
 
-function labels_propagated(old_labels::Set{Int}, new_labels::Set{Int}, condition::Int)
-  copy_old = deepcopy(old_labels)
+
+"""
+    check_propagation(old_labels, new_labels, effect)
+
+The union of effect with the intersection of old_labels and new_labels. Return if size changes occured to old_labels and the old_labels.
+"""
+function check_propagation(old_labels::Set{Int}, new_labels::Set{Int}, effect::Int)
+  size_old_labels = length(old_labels)
 
   if(!isempty(old_labels))
-    intersect!(old_labels, new_labels)
+    old_labels = intersect(old_labels, new_labels)
   else
     old_labels = new_labels
   end
+  union!(old_labels, effect)
 
-  push!(old_labels, condition)
-
-  return length(old_labels) != length(copy_old)
+  return Pair(length(old_labels) != size_old_labels, old_labels)
 end
 
-function union_preconditions(layer::Vector{graph_node}, precond::Vector{Vector{Int}})
-  result = Set{Int}()
+"""
+    union_preconditions(label_layer, preconditions)
 
-  for out in precond
-    for cond in out
-      union!(result, layer[cond].labels)
+The union of the preconditions labels in label_layer.
+"""
+function union_preconditions(label_layer::Vector{Set{Int}}, preconditions::Vector{Vector{Int}})
+  result = Set{Int}()
+  for arr_cond in preconditions
+    for cond in arr_cond
+      union!(result, label_layer[cond])
     end
   end
   return result
 end
 
-function union_effect(layer::Vector{graph_node}, effect::Vector{Int})
-  result = Set{Int}()
 
-  for cond in effect
-    union!(result, layer[cond].labels)
-  end
+"""
+    create_label_layer(pgraph, init_idxs)
 
-  return result
-end
-
-function create_graph_label(pgraph::PlanningGraph, domain::Domain, state::State)
-
+Create the label layer using pgraph and init_idxs.
+"""
+function create_label_layer(pgraph::PlanningGraph, init_idxs::BitVector)
   n_conditions = length(pgraph.conditions)
-  triggers = compute_propagation(pgraph)
-  
-  triggered = Set{Int}()
+  label_layer::Vector{Set{Int}} = [Set{Int}() for _ in 1:n_conditions]
+  condition_action_map = map_condition_action(pgraph)
+  queue = Set{Int}()
 
-  init_idxs = pgraph_init_idxs(pgraph, domain, state)
-  # prop_layer::Vector{graph_node}()
-  prop_layer =  Vector{graph_node}()
-
-  for i in 1:n_conditions
-    node = graph_node()
-    node.labels = Set{Int}()
-    push!(prop_layer, node)
-  end
-
+  # Initialize the initial layer.
   for i in findall(init_idxs)
-    push!(prop_layer[i].labels, i)
-  end
-
-  for (i, conditions) in enumerate(pgraph.conditions)
-    for action_id in triggers[i]
-      push!(triggered, action_id)
+    push!(label_layer[i], i)
+    for action_id in condition_action_map[i]
+      push!(queue, action_id)
     end
   end
 
-  changes = true
-
-  while(changes)
-    next_layer = deepcopy(prop_layer)
-    next_trigger = Set()
-    changes = false
-    for i in triggered
-      # precond::Vector{Vector{Int}}
-      precond = pgraph.act_parents[i]
-
-      if (check_precond_empty(prop_layer, precond))
-         
-        changed = apply_action_and_propagate(prop_layer, pgraph, i, next_layer, triggers)
+  while(!isempty(queue))
+    next_label_layer = copy(label_layer)
+    next_queue = Set{Int}()
+    for action in queue
+      preconditions = pgraph.act_parents[action]
+     
+      # Check if the action is applicable
+      if (check_precond_empty(label_layer, preconditions))
+        changed = apply_action_and_propagate(label_layer, next_label_layer, pgraph, action)
         if (!isempty(changed))
-        
-          changes = true
-          for j in changed
-            for val in triggers[j]
-              push!(next_trigger, val)
-            end
+          for condition in changed
+            union!(next_queue, condition_action_map[condition])
           end
         end
       end
-
     end
-    prop_layer = next_layer
-    triggered = next_trigger
+    label_layer = next_label_layer
+    queue = next_queue
   end
 
-  return prop_layer
+  return label_layer
 end
 
-function create_lm_graph(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
-  n_action = length(pgraph.actions)
+"""
+    create_lm_graph(label_layer, goals)
 
-  goals = pgraph.act_parents[n_action]
-
+Create the landmark graph using the label layer and goals.
+"""
+function create_lm_graph(label_layer::Vector{Set{Int}}, goals::Vector{Vector{Int}})
   landmark_graph::LandmarkGraph = LandmarkGraph(0, 0, Dict(), Dict(), [])
-
+  
   for goal in goals
-    for condition in goal
-      goalpair::FactPair = FactPair(condition, 1)
+    for goal_condition in goal
+      goalpair::FactPair = FactPair(goal_condition, 1)
 
       lm_node = nothing
+      # Check if the landmark graph contains the goal landmark
       if (landmark_graph_contains_landmark(landmark_graph, goalpair))
         lm_node = landmark_graph.simple_landmarks_to_nodes[goalpair]
         lm_node.landmark.is_true_in_goal = true
@@ -184,13 +168,13 @@ function create_lm_graph(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
         lm = Landmark(fact_vector, false, false, true, false, Set{}(), Set{}())
         lm_node = landmark_graph_add_landmark(landmark_graph, lm)
       end
-      for label in prop_layer[condition].labels
-        if(label == condition)
+      for condition in label_layer[goal_condition]
+        # Check if condition
+        if(condition == goal_condition)
           continue
         end
-
         node = nothing
-        factpair::FactPair = FactPair(label, 1)
+        factpair::FactPair = FactPair(condition, 1)
         if (!landmark_graph_contains_landmark(landmark_graph, factpair))
           fact_vector = Vector{FactPair}()
           push!(fact_vector, factpair)
@@ -206,25 +190,28 @@ function create_lm_graph(prop_layer::Vector{graph_node}, pgraph::PlanningGraph)
   return landmark_graph
 end
 
+
+"""
+    zhu_givan_landmark_extraction(domain, problem)
+
+Construct landmark graph that has the noncausal landmarks discarded.
+"""
 function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
   initial_state = initstate(domain, problem)
   spec = Specification(problem)
+  pgraph = build_planning_graph(domain, initial_state, spec)
 
-  statics = infer_static_fluents(domain)
-  pgraph = build_planning_graph(domain, initial_state, spec, statics = statics)
-  label_graph = create_graph_label(pgraph, domain , initial_state)
-  landmark_graph = create_lm_graph(label_graph, pgraph)
-
-  # println("amount of lm before verification:", length(landmark_graph.nodes))
-
-  term_index = Dict(map(reverse, enumerate(pgraph.conditions)))
   init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
-  initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(s, 1), findall(init_idxs))
+  label_graph = create_label_layer(pgraph, init_idxs)
 
+  goals = pgraph.act_parents[end]
+  landmark_graph = create_lm_graph(label_graph, goals)
+
+  # term_index = Dict(map(reverse, enumerate(pgraph.conditions)))
+  # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(s, 1), findall(init_idxs))
   # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(term_index[s], 1), keys(initial_state))
-  generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair)
-  discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
-
+  # generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair)
+  # discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
   # println("amount of lm after verification:", length(landmark_graph.nodes))
 
   return landmark_graph
