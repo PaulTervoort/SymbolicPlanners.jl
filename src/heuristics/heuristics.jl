@@ -10,7 +10,7 @@ Abstract type for search heuristics, which estimate the distance from a
 a `heuristic` can be called on a domain, state, and specification, returning a 
 `Real` number (typically `Float32` for reduced memory usage).
 
-    heuristic(domain, state, spec; precompute=true)
+    heuristic(domain, state, spec; precompute=tre)
 
 Heuristics may precompute and store information that will be used
 repeatedly during search via the [`precompute!`](@ref) method. Evaluation of
