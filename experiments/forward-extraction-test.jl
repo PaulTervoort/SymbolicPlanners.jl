@@ -5,14 +5,16 @@ println("Started")
 
 
 results = Vector{Tuple{String, Tuple{Set, Set, Set}}}()
-DOMAIN_NAME = "logistics" # One of "blocksworld", "logistics", "miconic"
+#TODO not consitend with current directory
+DOMAIN_TYPE = "logical" # "logical" or "numeric"
+DOMAIN_NAME = "blocksworld" # One of "blocksworld", "logistics", "miconic"
 
 
 for i in 1:9
     println("Iteration: ", i)
     # Load Blocksworld domain and single problem
 
-    domain_dir = joinpath(@__DIR__, "numeric", DOMAIN_NAME)
+    domain_dir = joinpath(@__DIR__, DOMAIN_TYPE, DOMAIN_NAME)
     domain = load_domain(joinpath(domain_dir, "domain.pddl"))
     problem = load_problem(joinpath(domain_dir, "instance-$(i).pddl"))
 

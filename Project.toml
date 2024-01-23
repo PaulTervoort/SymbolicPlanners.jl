@@ -5,7 +5,9 @@ version = "0.1.20"
 
 [deps]
 AutoHashEquals = "15f4f7f2-30c1-5605-9d31-71845cf9641f"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+Debugger = "31a5f54b-26ea-5ae9-a837-f05ce5417438"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 PDDL = "2c8894f9-daa1-498a-9e3a-26edd9623db8"
