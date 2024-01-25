@@ -102,7 +102,6 @@ function union_preconditions(label_layer::Vector{Set{Int}}, preconditions::Vecto
   return result
 end
 
-
 """
     create_label_layer(pgraph, init_idxs)
 

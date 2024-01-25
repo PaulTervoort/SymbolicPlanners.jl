@@ -78,9 +78,6 @@ include("forward.jl")
 include("backward.jl")
 include("bidirectional.jl")
 
-# Landmark planners
-include("ordered_landmarks.jl")
-
 # Policy-based planning algorithms
 include("rtdp.jl")
 include("rths.jl")
@@ -88,3 +85,7 @@ include("mcts.jl")
 
 # External planners
 include("external.jl")
+
+#Landmark local planner
+include("lm_local.jl")
+include("lm_local_smart.jl")

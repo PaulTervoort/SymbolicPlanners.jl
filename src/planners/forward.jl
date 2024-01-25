@@ -1,3 +1,4 @@
+import Base.gc_live_bytes
 export ForwardPlanner, BestFirstPlanner, UniformCostPlanner, GreedyPlanner
 export AStarPlanner, WeightedAStarPlanner
 export ProbForwardPlanner, ProbAStarPlanner
@@ -55,6 +56,8 @@ $(FIELDS)
     max_nodes::Int = typemax(Int)
     "Maximum time in seconds before planner times out."
     max_time::Float64 = Inf
+    "Maximum memory to use."
+    max_mem::Float64 = Inf
     "Flag to terminate search if the heuristic estimates an infinite cost."
     fail_fast::Bool = false
     "Flag to save the search tree and frontier in the returned solution."
@@ -205,7 +208,7 @@ function search!(sol::PathSearchSolution, planner::ForwardPlanner,
             sol.status = :success # Goal reached
         elseif sol.expanded >= planner.max_nodes
             sol.status = :max_nodes # Node budget reached
-        elseif time() - start_time >= planner.max_time
+        elseif time() - start_time >= planner.max_time || gc_live_bytes() > planner.max_mem
             sol.status = :max_time # Time budget reached
         elseif planner.fail_fast && priority[1] == Inf
             sol.status = :failure # Search space exhausted
@@ -258,7 +261,7 @@ function expand!(planner::ForwardPlanner, node::PathNode,
         end
         # Update path costs if new path is shorter
         next_node = get!(search_tree, next_id,
-                         PathNode(next_id, next_state, Inf32))
+        PathNode(next_id, next_state, Inf32))
         cost_diff = next_node.path_cost - path_cost
         if cost_diff > 0
             next_node.parent_id = node.id
@@ -266,8 +269,12 @@ function expand!(planner::ForwardPlanner, node::PathNode,
             next_node.path_cost = path_cost
             # Update estimated cost from next state to goal
             if !(next_id in keys(queue))
+                # LM Count is a pseudo heuristic it needs the correct previous state to compute the correct H value
+                if heuristic isa LMCount 
+                    heuristic.prev_state = state
+                end
                 h_val::Float32 = is_action_goal ? 
-                    0.0f0 : compute(heuristic, domain, next_state, spec)
+                0.0f0 : compute(heuristic, domain, next_state, spec)
                 f_val::Float32 = g_mult * path_cost + h_mult * h_val
                 priority = (f_val, h_val, length(search_tree))
                 enqueue!(queue, next_id, priority)
