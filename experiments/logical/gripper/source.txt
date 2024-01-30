@@ -1,3 +1,3 @@
 https://github.com/potassco/pddl-instances
 
-pddl-instances/ipc-2000/domains
+pddl-instances/ipc-1998/domains/gripper-round-1-strips

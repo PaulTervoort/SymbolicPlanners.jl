@@ -2,7 +2,7 @@ using PDDL, SymbolicPlanners, Test, PlanningDomains
 using DataFrames, CSV, Dates, Statistics
 
 planners = ["HAdd", "LM_Local-HAdd", "LM_Local_Smart-HAdd"]
-benchmark_file = "fp-landmark-benchmark.txt"
+benchmark_file = "fp-benchmark.txt"
 
 # Parse benchmark file
 domains::Vector{Pair{String, String}} = []
@@ -20,14 +20,14 @@ function parse_benchmark(benchmark_file_path::String)
                 instance_path::String = strip(s_parts[2])
                 if isempty(domain_path)
                     parts::Vector{String} = split(instance_path, '/')
-                    domain_path = joinpath(@__DIR__, joinpath(parts[1:length(parts) - 1]), "domain.pddl")
+                    domain_path = joinpath(dirname(@__DIR__), joinpath(parts[1:length(parts) - 1]), "domain.pddl")
                 end
 
                 if !haskey(instances, domain_string)
                     push!(domains, Pair(domain_string, domain_path))
                     instances[domain_string] = []
                 end
-                push!(instances[domain_string], Pair(instance_string, joinpath(@__DIR__, instance_path)))
+                push!(instances[domain_string], Pair(instance_string, joinpath(dirname(@__DIR__), instance_path)))
             end
         elseif !(' ' in strip(s))
             domain_string = strip(s)
