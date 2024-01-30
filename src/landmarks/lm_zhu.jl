@@ -1,4 +1,5 @@
 export zhu_givan_landmark_extraction
+export zhu_givan_landmark_extraction_noncausal
 
 """
     map_condition_action(pgraph)
@@ -214,4 +215,27 @@ function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
   # println("amount of lm after verification:", length(landmark_graph.nodes))
 
   return landmark_graph
+end
+
+function zhu_givan_landmark_extraction_noncausal(domain::Domain, problem::Problem)
+  initial_state = initstate(domain, problem)
+  spec = Specification(problem)
+  pgraph = build_planning_graph(domain, initial_state, spec)
+
+  init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
+  label_graph = create_label_layer(pgraph, init_idxs)
+
+  goals = pgraph.act_parents[end]
+  landmark_graph = create_lm_graph(label_graph, goals)
+
+  term_index = Dict(map(reverse, enumerate(pgraph.conditions)))
+  initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(s, 1), findall(init_idxs))
+  # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(term_index[s], 1), keys(initial_state))
+  #
+  generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair, Dict())
+  #
+  discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
+  # println("amount of lm after verification:", length(landmark_graph.nodes))
+
+  return Pair(landmark_graph, generation_data)
 end
