@@ -4,6 +4,10 @@ using Cairo, Compose
 export landmark_graph_draw_png
 export landmark_graph_print
 
+# Functions to visualize a landmark graph for debugging
+
+
+# Draw a landmark graph in a png picture
 function landmark_graph_draw_png(filename::String, landmark_graph::LandmarkGraph, planning_graph::PlanningGraph)
     node_lookup::Dict{LandmarkNode, Int} = Dict(map(reverse, enumerate(landmark_graph.nodes)))
     ne::Int = 0
@@ -12,6 +16,8 @@ function landmark_graph_draw_png(filename::String, landmark_graph::LandmarkGraph
     fadj::Vector{Vector{Int}} = []
     badj::Vector{Vector{Int}} = []
     edgelabels::Vector{String} = []
+
+    # Convert the graph format to a format accepted by the render library
     for node::LandmarkNode in landmark_graph.nodes
         nn += 1
         push!(names, "$(factpair_to_term(first(node.landmark.facts), planning_graph))")
@@ -32,13 +38,16 @@ function landmark_graph_draw_png(filename::String, landmark_graph::LandmarkGraph
     end
     g = SimpleDiGraph(ne, fadj, badj)
 
+    # Set 2d positions for nodes
     layout=(args...)->spring_layout(args...; C=25)
     p = gplot(g, layout=layout, nodelabel=names, NODELABELSIZE=3.0, NODESIZE=0.06, EDGELABELSIZE=3.0,
                 edgelabel=edgelabels, arrowlengthfrac=0.02, edgelabelc=colorant"orange")
 
+    # Draw to PNG
     draw(PNG(filename, 32cm, 32cm), p)
 end
 
+# Print all landmark nodes and outgoing edges
 function landmark_graph_print(landmark_graph::LandmarkGraph, planning_graph::PlanningGraph)
     node_lookup::Dict{LandmarkNode, Int} = Dict(map(reverse, enumerate(landmark_graph.nodes)))
 
@@ -51,6 +60,7 @@ function landmark_graph_print(landmark_graph::LandmarkGraph, planning_graph::Pla
     println()
 end
 
+# Helper function to convert a fact back to a term, useful for textual representation
 function factpair_to_term(factpair::FactPair, planning_graph::PlanningGraph) :: Term
     effect::Term = planning_graph.conditions[factpair.var]
     if factpair.value == 0
