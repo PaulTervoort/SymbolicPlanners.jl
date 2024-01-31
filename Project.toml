@@ -6,6 +6,7 @@ version = "0.1.20"
 [deps]
 AutoHashEquals = "15f4f7f2-30c1-5605-9d31-71845cf9641f"
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
+CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
 Compose = "a81c6b42-2e10-5240-aca2-a61377ecd94b"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"

@@ -5,10 +5,12 @@ function full_landmark_extraction(domain::Domain, problem::Problem, timeout::Flo
     # Initialize state and specification
     start_state = initstate(domain, problem)
     spec = Specification(problem)
-
-    compiled_domain, compiled_state = compiled(domain, start_state)
-    # Compute landmark graph
+    
+    
+    # Uncomment below to compute landmark graph without a timeout
     # (landmark_graph, generation_data) = compute_landmark_graph(domain, start_state, spec)
+    
+    # Compute relaxed landmark graph with timeout
     landmark_graph = LandmarkGraph(0, 0, Dict(), Dict(), [])
     try 
         (landmark_graph, generation_data) = compute_relaxed_landmark_graph(domain, start_state, spec, timeout)
@@ -43,16 +45,12 @@ function full_landmark_extraction(domain::Domain, problem::Problem, timeout::Flo
     # verified_landmarks = verify_landmarks(landmarks, planning_graph, domain, problem)
 
 
-    # Compute disjunctive landmarks using the verified landmarks
-
-    # disjuctive_landmarks = compute_disjunctive_landmarks(verified_landmarks, domain, problem)
-
     return (merged_landmarks, landmarks, zhu_landmarks)
     
 end
 
 
-
+# Find landmarks using forward propagation
 function propagate_landmarks(domain::Domain, problem::Problem)
 
     zhu_landmarks = zhu_givan_landmark_extraction(domain, problem)
@@ -66,6 +64,8 @@ function propagate_landmarks(domain::Domain, problem::Problem)
     return propagated_landmarks
 end
 
+# Merge landmarks from initial landmark extraction and propagated landmarks
+# Merging is done based on factpairs of the landmarks
 function merge_landmarks(landmarks::Set{Landmark}, propagated_landmarks::Set{Landmark})
 
     merged_facts = Set{Vector{FactPair}}()

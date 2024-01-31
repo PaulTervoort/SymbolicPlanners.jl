@@ -1,11 +1,12 @@
 # Run using 'julia --project=. experiments/full-extraction-test.jl'
 # Can also be ran using 'julia ./experiments/landmark-test.jl' after adding all the bellow packages in the julia pkg manager
-using PDDL, SymbolicPlanners, Test, PlanningDomains, DataFrames, Plots, StatsPlots
+using PDDL, SymbolicPlanners, Test, PlanningDomains, DataFrames, Plots, StatsPlots, CategoricalArrays
 
 println("Started")
 
 results = Vector{Tuple{String, Tuple{Set, Set, Set}}}()
 
+# Selected problems from the IPC competitions (See experiments/logical for more details)
 blocksworld = [1, 11, 15, 22, 29, 36, 43, 50, 57, 64, 71, 78, 85, 92, 99]
 
 grid = [1, 2, 4, 5]
@@ -16,9 +17,11 @@ logistics = [1, 10, 18, 21, 27, 34, 41, 49, 55, 61, 64, 69, 71, 78, 82]
 
 miconic = [4, 11, 23, 31, 42, 57, 65, 73, 84, 97, 106, 115, 121, 133, 146]
 
-DOMAIN_NAME = "logistics"
+# Change this to the desired domain
+DOMAIN_NAME = "blocksworld"
 
-for i in logistics
+# Run the landmark extraction for each problem (Make sure the domain is correct)
+for i in blocksworld
     println("Problem number: ", i)
     
     ## Load domain and problem ##
@@ -32,7 +35,7 @@ for i in logistics
 
     ## Run Landmark Extraction ##
 
-    maxTime = 75.0
+    maxTime = 600.0
     stats = @timed begin 
         full_landmarks = full_landmark_extraction(domain, problem, maxTime)
     end
@@ -42,34 +45,50 @@ for i in logistics
     println("Number of landmarks: ", length(full_landmarks[1]))
 
     ## Add results for plotting ##
-    push!(results, ("lg-$(i)", full_landmarks))
+    push!(results, ("fc-$(i)", full_landmarks))
 end
 
 
 function plot_results(results::Vector{Tuple{String, Tuple{Set, Set, Set}}}, domain_name::String)
-    df = DataFrame(domain=String[], full_landmarks=Int[], landmarks=Int[], zhu_landmarks=Int[])
+    # Create a DataFrame with the results
+    df = DataFrame(domain=String[], problem_number=Int[], FULL=Int[], Backward=Int[], Forward=Int[])
 
+    # Add the results to the DataFrame
     for (domain, (full_landmarks, landmarks, zhu_landmarks)) in results
-        push!(df, (domain, length(full_landmarks), length(landmarks), length(zhu_landmarks)))
+        problem_number = parse(Int, match(r"\d+", domain).match)
+        push!(df, (domain, problem_number, length(full_landmarks), length(landmarks), length(zhu_landmarks)))
     end
 
-    # Melt the DataFrame to combine multiple columns for plotting
-    melted_df = stack(df, Not(:domain))
+    # Sort the DataFrame by problem number
+    sorted_df = sort(df, [:problem_number, :domain])
 
+    # Convert domain column to a categorical type with the specified order
+    sorted_df.domain = categorical(sorted_df.domain, levels=sorted_df.domain)
+
+    # Melt the DataFrame to combine multiple columns for plotting
+    melted_df = stack(sorted_df, Not(:domain, :problem_number))
+
+    variable_order = ["FULL", "Backward", "Forward"]
+
+    # Order the 'variable' column based on the specified order
+    melted_df.variable = categorical(melted_df.variable, levels=variable_order)
+
+    # Plot the results with the specified order
     p = groupedbar(
         melted_df.domain,
         melted_df.value,
         group=melted_df.variable,
+        order=unique(sorted_df.domain),
         xlabel="Problem instance",
         ylabel="Number of landmarks",
-        title="Full landmark extraction of $(domain_name)",
         bar_width=0.8,
         bar_position=:dodge,
         xrotation=45,
-        legend=:topleft
+        legend=:topleft,
+        ylims=(0,5)
     )
     
-    savefig(p, "$(domain_name)_relaxed_full_extraction.png")
+    savefig(p, "experiments/$(DOMAIN_NAME)_relaxed_full_extraction.png")
 end
 
 plot_results(results, DOMAIN_NAME)
