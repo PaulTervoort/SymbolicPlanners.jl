@@ -269,23 +269,24 @@ function compute_relaxed_landmark_graph(domain::Domain, state::State, spec::Spec
     landmark_graph::LandmarkGraph = LandmarkGraph(0, 0, Dict(), Dict(), [])
     planning_graph::PlanningGraph = build_planning_graph(domain, state, spec)
 
+    # Process initial state
     if !(state isa GenericState)
         state = GenericState(state)
     end
-
     for term::Term in keys(state)
         if !(term in planning_graph.conditions)
             push!(planning_graph.conditions, term)
         end
     end
     term_index = Dict(map(reverse, enumerate(planning_graph.conditions)))
-
     initial_state::Vector{FactPair} = map(s -> FactPair(term_index[s], 1), keys(state))
-    generation_data::LandmarkGenerationData = LandmarkGenerationData(planning_graph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state, Dict())
 
+    # Create a struct to pass info to subroutines and back
+    generation_data::LandmarkGenerationData = LandmarkGenerationData(planning_graph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state, Dict())
     dtg_successors::Dict{Int, Dict{Int, Set{Int}}} = build_dtg_successors(generation_data)
     disjunction_classes::Dict{Int, Dict{Int, Int}} = build_disjunction_classes(generation_data)
 
+    # Add the goal facts to the queue for backwards traversal
     open_landmarks::Queue{LandmarkNode} = Queue{LandmarkNode}()
     for fact::Term in spec.terms
         fact_pair::Vector{FactPair} = [FactPair(generation_data.term_index[fact], 1)]
@@ -294,6 +295,7 @@ function compute_relaxed_landmark_graph(domain::Domain, state::State, spec::Spec
         enqueue!(open_landmarks, lm_node)
     end
 
+    # Continue until queue empty
     start_time::Float64 = time()
     forward_orders::Dict{LandmarkNode, Vector{FactPair}} = Dict()
     while !isempty(open_landmarks)
@@ -304,17 +306,22 @@ function compute_relaxed_landmark_graph(domain::Domain, state::State, spec::Spec
         lm_node::LandmarkNode = dequeue!(open_landmarks)
         landmark::Landmark = lm_node.landmark
 
+        # Only continue if landmark not true in initial state (is the end of backwards traversal)
         if !landmark_is_true_in_state(landmark, initial_state)
             excluded_op_ids::Vector{Int} = []
             excluded_props::Vector{FactPair} = landmark.facts
+
+            # Find which facts can be reached without making this landmark true
             reached::Dict{Pair{Int, Int}, Bool} = compute_relaxed_reachability(generation_data, initial_state, excluded_props, excluded_op_ids)
 
+            # Add shared preconditions as new landmarks to the queue 
             shared_pre::Dict{Int, Int} = compute_shared_preconditions(generation_data, reached, landmark)
             for pre::Pair{Int, Int} in shared_pre
                 found_simple_lm_and_order(landmark_graph, FactPair(pre.first, pre.second), lm_node, GREEDY_NECESSARY, open_landmarks, forward_orders)
             end
             approximate_lookahead_orders(generation_data, reached, lm_node, dtg_successors, landmark_graph, open_landmarks, forward_orders)
 
+            # Search for possible dijuntive landmarks
             disjunctive_pre::Vector{Set{FactPair}} = compute_disjunctive_preconditions(generation_data, reached, landmark, disjunction_classes, landmark_graph)
             for preconditions::Set{FactPair} in disjunctive_pre
                 if length(preconditions) < 5
@@ -324,6 +331,7 @@ function compute_relaxed_landmark_graph(domain::Domain, state::State, spec::Spec
         end
     end
 
+    # Add forward order edges and give nodes unique ID's
     add_lm_forward_orders(landmark_graph, forward_orders)
     landmark_graph_set_landmark_ids(landmark_graph)
 
@@ -1002,6 +1010,7 @@ function approximate_reasonable_orders(landmark_graph::LandmarkGraph, generation
             continue
         end
 
+        # If a landmark is true in the goal, it is reasonably ordered after interfering landmarks
         if landmark.is_true_in_goal
             for node2::LandmarkNode in landmark_graph.nodes
                 landmark2::Landmark = node2.landmark
@@ -1013,6 +1022,7 @@ function approximate_reasonable_orders(landmark_graph::LandmarkGraph, generation
                 end
             end
         else
+            # Otherwise use existing edges to find interesting nodes
             interesting_nodes::Set{LandmarkNode} = Set()
             for child::Pair{LandmarkNode, EdgeType} in node.children
                 node2::LandmarkNode = child.first
@@ -1032,6 +1042,7 @@ function approximate_reasonable_orders(landmark_graph::LandmarkGraph, generation
                 end
             end
 
+            # Interesting nodes that interfere are ordered earlier
             for node2::LandmarkNode in interesting_nodes
                 landmark2::Landmark = node2.landmark
                 if landmark == landmark2 || landmark2.disjunctive
