@@ -9,7 +9,7 @@ pkg> instantiate -v
 ```
 For benchmark runs, look "forward_benchmark" branch
 
-See ['fp-example.jl'](fp-example) for example on how to use the forward propagation and to run use the following.
+See ['fp-example.jl'](fp-example.jl) for example on how to use the forward propagation and to run use the following.
 
 ```
 julia --project=example-ka example-ka/fp-example.jl
