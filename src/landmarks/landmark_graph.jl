@@ -13,6 +13,8 @@ export landmark_graph_contains_disjunctive, landmark_graph_contains_landmark, la
 export landmark_graph_remove_occurences, landmark_graph_remove_node, landmark_graph_remove_node_if
 export landmark_graph_set_landmark_ids
 
+# Landmark graph structure, inspired by Fast-Downward
+
 
 mutable struct FactPair
     var::Int
@@ -48,6 +50,7 @@ mutable struct Landmark
     possible_achievers::Set{Int}
 end
 
+# Check if a landmark is true in a state
 function landmark_is_true_in_state(landmark::Landmark, p_graph::PlanningGraph, state::State) :: Bool
     if landmark.disjunctive
         for fact::FactPair in landmark.facts
@@ -66,6 +69,7 @@ function landmark_is_true_in_state(landmark::Landmark, p_graph::PlanningGraph, s
     end
 end
 
+# Check if a landmark is true in a state represented as a vector of factpairs
 function landmark_is_true_in_state(landmark::Landmark, state::Vector{FactPair}) :: Bool
     state_dict::Dict{Int, Int} = Dict()
     for fp::FactPair in state
@@ -89,6 +93,7 @@ function landmark_is_true_in_state(landmark::Landmark, state::Vector{FactPair}) 
 end
 
 
+# Edge types for order: higher number is more important order
 @enum EdgeType begin
     NECESSARY = 3
     GREEDY_NECESSARY = 2
@@ -104,6 +109,7 @@ mutable struct LandmarkNode
     children::Dict{LandmarkNode, EdgeType}
 end
 
+# Convert a landmark to a landmarknode
 function node_from_landmark(landmark::Landmark) :: LandmarkNode
     return LandmarkNode(-1, landmark, Dict([]), Dict([]))
 end
@@ -117,6 +123,7 @@ mutable struct LandmarkGraph
     nodes::Vector{LandmarkNode}
 end
 
+# Calculate number of edges in graph
 function landmark_graph_get_num_edges(landmark_graph::LandmarkGraph) :: Int
     total = 0
     for node in landmark_graph.nodes
@@ -125,12 +132,14 @@ function landmark_graph_get_num_edges(landmark_graph::LandmarkGraph) :: Int
     return total
 end
 
+# Get a landmarknode from a fact
 function landmark_graph_get_node(landmark_graph::LandmarkGraph, fact_pair::FactPair) :: Union{LandmarkNode, Nothing}
     return get(landmark_graph.simple_landmarks_to_nodes, fact_pair) do
         get(landmark_graph.disjunctive_landmarks_to_nodes, fact_pair, nothing)
     end
 end
 
+# Check if one fact from a set corresponds to a disjunctive landmark
 function landmark_graph_overlaps_disjunctive(landmark_graph::LandmarkGraph, fact_pairs::Set{FactPair}) :: Bool
     for fact::FactPair in fact_pairs
         if haskey(landmark_graph.disjunctive_landmarks_to_nodes, fact)
@@ -140,6 +149,7 @@ function landmark_graph_overlaps_disjunctive(landmark_graph::LandmarkGraph, fact
     return false
 end
 
+# Check if a set of facts belogns to the same disjuntive landmark
 function landmark_graph_contains_disjunctive(landmark_graph::LandmarkGraph, fact_pairs::Set{FactPair}) :: Bool
     node::Union{LandmarkNode, Nothing} = nothing
     for fact::FactPair in fact_pairs
@@ -155,11 +165,13 @@ function landmark_graph_contains_disjunctive(landmark_graph::LandmarkGraph, fact
     return true
 end
 
+# Check if a landmark exists in a landmarkgraph
 function landmark_graph_contains_landmark(landmark_graph::LandmarkGraph, fact_pair::FactPair) :: Bool
     return haskey(landmark_graph.simple_landmarks_to_nodes, fact_pair) ||
         haskey(landmark_graph.disjunctive_landmarks_to_nodes, fact_pair)
 end
 
+# Add a landmark to a landmarkgraph
 function landmark_graph_add_landmark(landmark_graph::LandmarkGraph, landmark::Landmark) :: LandmarkNode
     new_node::LandmarkNode = node_from_landmark(landmark)
     push!(landmark_graph.nodes, new_node)
@@ -176,6 +188,7 @@ function landmark_graph_add_landmark(landmark_graph::LandmarkGraph, landmark::La
     return new_node
 end
 
+# Remove all relations of a landmarknode from a landmarkgraph
 function landmark_graph_remove_occurences(landmark_graph::LandmarkGraph, node::LandmarkNode)
     for parent::LandmarkNode in keys(node.parents)
         delete!(parent.children, node)
@@ -197,10 +210,12 @@ function landmark_graph_remove_occurences(landmark_graph::LandmarkGraph, node::L
     end
 end
 
+# Remove a landmarknode from a landmarkgraph
 function landmark_graph_remove_node(landmark_graph::LandmarkGraph, node::LandmarkNode)
     filter!(n -> n != node, landmark_graph.nodes)
 end
 
+# Remove all landmarknodes that satisfy a predicate from a landmarkgraph
 function landmark_graph_remove_node_if(landmark_graph::LandmarkGraph, condition::Function)
     filter!(node -> begin
         if condition(node)
@@ -211,6 +226,7 @@ function landmark_graph_remove_node_if(landmark_graph::LandmarkGraph, condition:
     end, landmark_graph.nodes)
 end
 
+# Give all landmarks in a landmark graph a unique ID
 function landmark_graph_set_landmark_ids(landmark_graph::LandmarkGraph)
     id = 0
     for node::LandmarkNode in landmark_graph.nodes
