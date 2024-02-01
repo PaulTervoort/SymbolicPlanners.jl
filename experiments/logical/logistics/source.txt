@@ -1,4 +1,0 @@
-https://github.com/potassco/pddl-instances
-
-pddl-instances/ipc-2000/domains/logistics-strips-typed
-
