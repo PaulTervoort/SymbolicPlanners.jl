@@ -194,7 +194,7 @@ end
 """
     zhu_givan_landmark_extraction(domain, problem)
 
-Construct landmark graph that has the noncausal landmarks discarded.
+Construct landmark graph that has no noncausal landmark discarded.
 """
 function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
   initial_state = initstate(domain, problem)
@@ -206,17 +206,16 @@ function zhu_givan_landmark_extraction(domain::Domain, problem::Problem)
 
   goals = pgraph.act_parents[end]
   landmark_graph = create_lm_graph(label_graph, goals)
-
-  # term_index = Dict(map(reverse, enumerate(pgraph.conditions)))
-  # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(s, 1), findall(init_idxs))
-  # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(term_index[s], 1), keys(initial_state))
-  # generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair)
-  # discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
-  # println("amount of lm after verification:", length(landmark_graph.nodes))
-
   return landmark_graph
 end
 
+
+
+"""
+    zhu_givan_landmark_extraction_noncausal(domain, problem)
+
+Construct landmark graph that has the noncausal landmarks discarded.
+"""
 function zhu_givan_landmark_extraction_noncausal(domain::Domain, problem::Problem)
   initial_state = initstate(domain, problem)
   spec = Specification(problem)
@@ -230,12 +229,9 @@ function zhu_givan_landmark_extraction_noncausal(domain::Domain, problem::Proble
 
   term_index = Dict(map(reverse, enumerate(pgraph.conditions)))
   initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(s, 1), findall(init_idxs))
-  # initial_state_fact_pair::Vector{FactPair} = map(s -> FactPair(term_index[s], 1), keys(initial_state))
-  #
   generation_data::LandmarkGenerationData = LandmarkGenerationData(pgraph, term_index, Queue{Proposition}(), Set(), Dict(), Dict(), [], initial_state_fact_pair, Dict())
   #
   discard_noncausal_landmarks(landmark_graph, generation_data, initial_state_fact_pair, spec)
-  # println("amount of lm after verification:", length(landmark_graph.nodes))
 
   return Pair(landmark_graph, generation_data)
 end
