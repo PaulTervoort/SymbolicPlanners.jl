@@ -44,7 +44,7 @@ function full_landmark_extraction(domain::Domain, problem::Problem)
 
     # disjuctive_landmarks = compute_disjunctive_landmarks(verified_landmarks, domain, problem)
 
-    return (merged_landmarks, landmarks, zhu_landmarks)
+    return (merged_landmarks, landmarks, zhu_landmarks, generation_data)
     
 end
 

@@ -46,7 +46,6 @@ function precompute!(h::FFHeuristic,
     h.goal_hash = nothing
     h.statics = infer_static_fluents(domain)
     h.graph = build_planning_graph(domain, state; statics=h.statics)
-    label_graph = graph_label(h.graph, domain, state)
     return h
 end
 
@@ -57,7 +56,6 @@ function precompute!(h::FFHeuristic,
     h.goal_hash = hash(spec)
     h.statics = infer_static_fluents(domain)
     h.graph = build_planning_graph(domain, state, spec; statics=h.statics)
-    label_graph = graph_label(h.graph, domain, state)
     return h
 end
 
