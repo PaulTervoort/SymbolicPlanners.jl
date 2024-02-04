@@ -46,5 +46,7 @@ include("simulators.jl")
 include("heuristics.jl")
 # Test planners
 include("planners.jl")
+# Test specifications
+include("landmarks.jl")
 
 PDDL.Arrays.deregister!()

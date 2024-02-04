@@ -1,4 +1,6 @@
 include("landmark_graph.jl")
+include("full_landmark_extraction.jl")
+include("lm_zhu.jl")
 include("landmark_generation.jl")
 include("landmark_status_manager.jl")
 include("lm_count.jl")
