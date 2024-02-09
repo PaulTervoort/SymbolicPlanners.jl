@@ -191,22 +191,52 @@ end
 """
     zhu_givan_landmark_extraction(domain, problem)
 
-Construct landmark graph that has no noncausal landmark discarded.
+extract landmarks by converting plangraph to an and/or graph
 """
 function and_or_landmark_extraction(domain::Domain, problem::Problem)
   initial_state = initstate(domain, problem)
   spec = Specification(problem)
   pgraph = build_planning_graph(domain, initial_state, spec)
-
+  
+  #what is label graph? why nesc? --> assming part of zhu and givan alg
   init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
-  label_graph = create_label_layer(pgraph, init_idxs)
+  #label_graph = create_label_layer(pgraph, init_idxs)
 
   goals = pgraph.act_parents[end]
-  landmark_graph = create_lm_graph(label_graph, goals)
+
+
+  #build AND/OR graph : nodes I, OR, AND
+  #assign vals untill fixpoint is found
+  #write check_fixpoint()
+
+
+  landmark_graph = generate_landmarks_draft(pgraph, goals)
+
   return landmark_graph
 end
 
-function and_or_process(planning_graph::PlanningGraph, goal::Term)
+function generate_landmarks(pgraph::PlanningGraph, goal) 
+  #build graph : nodes I, OR, AND
+
+  "assign vals untill fixpoint is found :
+
+          One way to
+          compute the solution is to perform a ﬁxpoint computation in which
+          the set of landmarks for each vertex except those in VI is initialized
+          to the set of all of the vertices of the graph G and then iteratively
+          updated by interpreting the equations as update rules. If the updates
+          are performed according to the order in which nodes are generated in
+          the relaxed planning graph (i. e., all nodes in the ﬁrst layer, then all
+          nodes in the second layer, etc.), then we obtain exactly the RPG label
+          propagation algorithm by Zhu & Givan [12], computing action land-
+          marks as well as causal fact landmarks. If only fact landmarks are
+          sought, the equation for AND nodes can be modiﬁed to not include
+          {v} in LM(v).
+  "
+  #write check_fixpoint()
+end
+
+function generate_landmarks_draft(planning_graph::PlanningGraph, goal)
   # Initialize landmarks for all nodes
   landmarks = Dict{Int, Set{Int}}()
   for i in 1:length(planning_graph.conditions)
@@ -225,18 +255,19 @@ function and_or_process(planning_graph::PlanningGraph, goal::Term)
           # Update landmarks for condition nodes
           if !planning_graph.cond_derived[i]
               parents = get_parents(planning_graph, i)
-              updated_landmarks[i] = Set([i]) ∪ ∩([landmarks[parent] for parent in parents])
+              #TODO strange union / intersection thing happening here : ⋂
+              updated_landmarks[i] = Set([i]) ∪ ([landmarks[parent] for parent in parents])
           end
       end
 
       for i in 1:length(planning_graph.actions)
           # Update landmarks for action nodes
           children = planning_graph.act_children[i]
-          updated_landmarks[i + planning_graph.n_goals] = Set([i + planning_graph.n_goals]) ∪ ⋂([landmarks[child] for child in children])
+          updated_landmarks[i + planning_graph.n_goals] = Set([i + planning_graph.n_goals]) ∪ ([landmarks[child] for child in children])
       end
 
       # Check for fixpoint
-      if updated_landmarks == landmarks
+      if updated_landmarks == landmarks 
           break
       end
 

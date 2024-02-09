@@ -26,5 +26,5 @@ for i in 1:9
         zhu_givan_landmark = and_or_landmark_extraction(domain, problem)
     end
     println("Zhu Givan Landmark extraction in ", stats.time, " seconds")
-    println("Number of landmarks: ", length(zhu_givan_landmark.nodes))
+    println("Number of landmarks: ", zhu_givan_landmark)
 end
