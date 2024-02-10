@@ -13,19 +13,19 @@ import SymbolicPlanners.build_planning_graph
 import SymbolicPlanners.pgraph_init_idxs
 
 #this is modified from ka's code
-function and_or_landmark_extr(domain::Domain, problem::Problem)
-    initial_state = initstate(domain, problem)
-    spec = Specification(problem)
-    pgraph = build_planning_graph(domain, initial_state, spec)
+# function and_or_landmark_extr(domain::Domain, problem::Problem)
+#     initial_state = initstate(domain, problem)
+#     spec = Specification(problem)
+#     pgraph = build_planning_graph(domain, initial_state, spec)
   
-    init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
-    label_graph = pgraph_init_idxs(pgraph, init_idxs)
+#     init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
+#     label_graph = pgraph_init_idxs(pgraph, init_idxs)
   
-    goals = pgraph.act_parents[end]
-    #breaks it
-    landmark_graph = create_lm_graph(label_graph, goals)
-    return landmark_graph
-end
+#     goals = pgraph.act_parents[end]
+#     #breaks it
+#     landmark_graph = create_lm_graph(label_graph, goals)
+#     return landmark_graph
+# end
 
 
 #experiment
@@ -38,8 +38,8 @@ for i in 1:9
     problem = load_problem(joinpath(domain_dir, "instance-$(i).pddl"))
 
     # Initialize state
-    state = initstate(domain, problem)
-    spec = Specification(problem)
+    #state = initstate(domain, problem)
+    #spec = Specification(problem)
 
     stats = @timed begin
        and_or_landmark = and_or_landmark_extraction(domain, problem)
