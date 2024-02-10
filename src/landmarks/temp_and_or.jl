@@ -83,7 +83,6 @@ function build_and_or(domain::Domain, problem::Problem)
       
       #I = initial facts 
       for (i,f) in enumerate(initial_facts) # TODO i doesnt make any sense here -> doesnt ref og facts
-       # push!(i_set, (i, f, "I"))
         push!(nodes, (i, f, "I"))
         push!(edges_to_child, Vector{Int}()) 
         push!(edges_to_pred, Vector{Int}()) 
@@ -92,7 +91,6 @@ function build_and_or(domain::Domain, problem::Problem)
       #traverse facts -> add or nodes
       for (i,f) in enumerate(all_facts)
         if isnothing(findfirst( x -> x[2] == f, nodes))  #TODO use of findfirst is ass here
-      #    push!(or_set, (i, f, "OR"))
           push!(nodes, (i, f, "OR"))
           push!(edges_to_child,  Vector{Int}())
           push!(edges_to_pred, Vector{Int}()) 
@@ -188,6 +186,7 @@ function gen_landmarks(nodes::Vector, edges::Vector)
 
   #traversal queue 
   nodes_left = Vector()
+
   for x::Int64 in range(1, lastindex(nodes)) #TODO ugly
     push!(nodes_left, x)
   end
@@ -216,11 +215,13 @@ function gen_landmarks(nodes::Vector, edges::Vector)
       temp_lms_per_node[i] = [curr_node[2]]
     #Or node's landmark is intersection of all its preconditions landmarks
     elseif curr_node[3] == "OR"
+      temp_lms_per_node[i] = [curr_node[2]]
       for pred_i in edges[i]
         temp_lms_per_node[i] = intersect!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
       end   
     #And node's landmark is union of all its preconditions landmarks
-    elseif curr_node[] == "AND"
+    elseif curr_node[3] == "AND"
+      temp_lms_per_node[i] = [curr_node[2]]
       for pred_i in edges[i]
         temp_lms_per_node[i] = union!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
       end
@@ -228,12 +229,17 @@ function gen_landmarks(nodes::Vector, edges::Vector)
 
 
 
-     #stop of fixpoint reached
-     if temp_lms_per_node == lms_per_node
-        break
-     else
-      lms_per_node = temp_lms_per_node
-     end
+    #stop of fixpoint reached
+    #  if temp_lms_per_node == lms_per_node
+    #     break
+    #  else
+    #   lms_per_node = temp_lms_per_node
+    #  end
+
+    if size(nodes_left) == 0
+      break
+    end
+    lms_per_node = temp_lms_per_node
 
   end  
 
