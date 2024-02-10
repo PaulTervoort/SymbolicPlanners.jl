@@ -13,16 +13,16 @@ extract landmarks by converting plangraph to an and/or graph
   #   OrNodes
   # end
 
-  #TODO tyoe of node should be implcit by position in tree -> init is fact, child is action, child is faact...
-  #@enum andOR_node_type AND=1 OR=2 I=3
 
-  # struct andOr_node
-  #   index::Int
-  #   type::andOR_node_type
-  #   parents::Vector[Int] #nesc?
-  #   and_children::Vector[Int] #refs prgraph actions
-  #   or_children::Vector[Int] #refs prgraph conditions
-  # end
+  @enum andOR_node_type AND=1 OR=2 init=3
+
+  struct andOr_node
+    index::Int
+    type::andOR_node_type
+    parents::Vector[Int] #nesc?
+    and_children::Vector[Int] #refs prgraph actions
+    or_children::Vector[Int] #refs prgraph conditions
+  end
 
 
 
@@ -39,9 +39,6 @@ function and_or_landmark_extraction(domain::Domain, problem::Problem)
 
   #check solution?
   #goals = pgraph.act_parents[end]
-  
-
-
 
   #build AND/OR graph : nodes I, OR, AND
   #assign vals untill fixpoint is found
@@ -164,7 +161,7 @@ function compute_fixpoint(pgraph)
           marks as well as causal fact landmarks. If only fact landmarks are
           sought, the equation for AND nodes can be modiﬁed to not include
           {v} in LM(v).
-    concl: updating in order of plangraph gives same alg? -> maybe later
+    concl: updating in order of plangraph gives same alg? -> maybe later -> can we say order is implicit because we generate graph from plangraph?
   "
   # traverse graph untill fixpoint: gives landmark set
   # LM(Vg) = uninion of all returned 
