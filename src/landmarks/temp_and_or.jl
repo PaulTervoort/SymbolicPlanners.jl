@@ -212,15 +212,15 @@ function gen_landmarks(nodes::Vector, edges::Vector)
     #cases by node type
 
     # Init node's landmark is itself
-    if curr_node[2] == "I"
+    if curr_node[3] == "I"
       temp_lms_per_node[i] = [curr_node[2]]
     #Or node's landmark is intersection of all its preconditions landmarks
-    elseif curr_node[2] == "OR"
+    elseif curr_node[3] == "OR"
       for pred_i in edges[i]
         temp_lms_per_node[i] = intersect!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
       end   
     #And node's landmark is union of all its preconditions landmarks
-    elseif curr_node[2] == "AND"
+    elseif curr_node[] == "AND"
       for pred_i in edges[i]
         temp_lms_per_node[i] = union!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
       end
