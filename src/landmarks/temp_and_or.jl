@@ -76,7 +76,7 @@ function build_and_or(domain::Domain, problem::Problem)
   # edges : [from , to] -> indexes in node set
 
   nodes = Vector() 
-  edges = Vector()
+  edges = Vector() # TODO PUSH EDGE ENTRY WHEN NODE IS PUSHED!!!
   
   # create sets I , AND, OR from prev sets #TODO -> these are just maps?
       
@@ -85,6 +85,7 @@ function build_and_or(domain::Domain, problem::Problem)
       for (i,f) in enumerate(initial_facts) # TODO i doesnt make any sense here -> doesnt ref og facts
        # push!(i_set, (i, f, "I"))
         push!(nodes, (i, f, "I"))
+        push!(edges, (lastindex(nodes), Vector{Int}())) #TODO i here for tests, but not nesc
       end
 
       #traverse facts -> add or nodes
@@ -93,7 +94,7 @@ function build_and_or(domain::Domain, problem::Problem)
         if isnothing(findfirst( x -> x[2] == f, nodes))  #TODO use of findfirst is ass here
       #    push!(or_set, (i, f, "OR"))
           push!(nodes, (i, f, "OR"))
-
+          push!(edges, (lastindex(nodes), Vector{Int}()))
         end
       end
       
@@ -107,7 +108,9 @@ function build_and_or(domain::Domain, problem::Problem)
         #add nodes
       #  push!(and_set, (action_i, a, "AND"))
         push!(nodes, (action_i, a, "AND"))
+
         node_i = lastindex(nodes)
+        push!(edges, (node_i, Vector{Int}()))
 
         #get pre and post tems
         pre_conds::Term = PDDL.get_precond( a)   # term = name & args
@@ -117,7 +120,7 @@ function build_and_or(domain::Domain, problem::Problem)
         for pre in pre_conds.args
           fact_i = findfirst( x -> x[2] == pre, nodes)
           if fact_i !== nothing
-            push!(edges, (fact_i, node_i)) 
+            push!(edges[fact_i][2], node_i)
 
           end
         end
@@ -127,19 +130,19 @@ function build_and_or(domain::Domain, problem::Problem)
           if post.name !== :not # skip if 'not' term -> delete effect represented by 'not' term
             fact_i = findfirst( x -> x[2] == post, nodes)
             if fact_i !== nothing 
-              push!(edges, (node_i, fact_i)) 
+              push!(edges[node_i][2], fact_i) 
             end
           end
         end
       end
 
-    #TODO do edge struct like this in prev blocks instead of rewriting
-    #rewrite edges
-    temp_edges = Array{Vector{Any}}(Vector(), length(nodes))
-    for e in edges
-      push!(temp_edges[e[1]], e[2])
-    end
-    edges = temp_edges
+    # #TODO do edge struct like this in prev blocks instead of rewriting
+    # #rewrite edges
+    # temp_edges = Array{Vector{Any}}(Vector(), length(nodes))
+    # for e in edges
+    #   push!(temp_edges[e[1]], e[2])
+    # end
+    # edges = temp_edges
 
     return (nodes, edges)
 end
@@ -188,8 +191,9 @@ end
 
 function gen_node_landmarks(i::Int , nodes::Vector, edges::Vector)
   # init with v -> v is a landmark for itself
-  node_landmarks = Set(curr_node[2]);
   curr_node = nodes[i]
+  node_landmarks = Set(curr_node[2]);
+  
 
   #cases by node type
   if curr_node[3] == "I"
