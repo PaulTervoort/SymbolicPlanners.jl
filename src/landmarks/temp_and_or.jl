@@ -110,6 +110,7 @@ function build_and_or(domain::Domain, problem::Problem)
         push!(nodes, (action_i, a, "AND"))
 
         node_i = lastindex(nodes)
+
         push!(edges_to_child, Vector{Int}())
         push!(edges_to_pred, Vector{Int}()) 
 
@@ -173,13 +174,68 @@ function gen_landmarks(nodes::Vector, edges::Vector)
   "
   # traverse graph untill fixpoint: gives landmark set
   # LM(Vg) = uninion of all returned from
-  #""
   landmarks = Set()
 
- # 			for v in VG
+
+  #avoid recurision and overflow -> keep list of landmarks per node & do fixppiont -> iterate untill landmarks dont change or 100x iterations
+  # initialize all nodes have all nodes as landmarks 
+  lms_per_node = Vector()
+  
+  # initialize as all nodes have all nodes as landmarks 
   for i in range(1, lastindex(nodes))
-    landmarks = union!(landmarks, gen_node_landmarks(i, nodes, edges))
+    push!(lms_per_node, copy(nodes))
   end
+
+  #traversal queue 
+  nodes_left = Vector()
+  for x::Int64 in range(1, lastindex(nodes)) #TODO ugly
+    push!(nodes_left, x)
+  end
+
+  #update untill fixpoint reached
+  while true
+    i = popfirst!(nodes_left)
+
+    #temp for fixpoint check
+    temp_lms_per_node = copy(lms_per_node)
+    curr_node = nodes[i]
+
+    #OLD
+    # # for v in VG
+    # for i in range(1, lastindex(nodes))
+    #   landmarks = union!(landmarks, gen_node_landmarks(i, nodes, edges))
+    # end
+
+
+
+
+    #cases by node type
+
+    # Init node's landmark is itself
+    if curr_node[2] == "I"
+      temp_lms_per_node[i] = [curr_node[2]]
+    #Or node's landmark is intersection of all its preconditions landmarks
+    elseif curr_node[2] == "OR"
+      for pred_i in edges[i]
+        temp_lms_per_node[i] = intersect!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
+      end   
+    #And node's landmark is union of all its preconditions landmarks
+    elseif curr_node[2] == "AND"
+      for pred_i in edges[i]
+        temp_lms_per_node[i] = union!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
+      end
+    end
+
+
+
+     #stop of fixpoint reached
+     if temp_lms_per_node == lms_per_node
+        break
+     else
+      lms_per_node = temp_lms_per_node
+     end
+
+  end  
 
   return landmarks
   
@@ -193,24 +249,7 @@ function gen_node_landmarks(i::Int , nodes::Vector, edges::Vector)
   push!(node_landmarks, curr_node[2])
   
 
-  #cases by node type
-  if curr_node[3] == "I"
-    return node_landmarks;
-  elseif curr_node[3] == "OR"
-#				-> {v} intersect 
-# 						for u in pre(v)
-# 							 LM(u)
-    for pred_i in edges[i]
-      node_landmarks = push!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges)) #should be intersect
-    end   
-  elseif curr_node[3] == "AND"
-# 				-> {v} union
-# 						for u in pre(v)
-# 							 LM(u)
-    for pred_i in edges[i]
-      node_landmarks = push!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges))#should be union
-    end
-  end
+
 end
 
 # # Pre(v) = u for all <u, v> in E -> its a map :)
