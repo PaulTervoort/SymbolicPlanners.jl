@@ -42,7 +42,7 @@ for i in 1:9
     spec = Specification(problem)
 
     stats = @timed begin
-       and_or_landmark = and_or_landmark_extr(domain, problem)
+       and_or_landmark = and_or_landmark_extraction(domain, problem)
     end
     println("AND / OR Landmark extraction in ", stats.time, " seconds")
     println("Number of landmarks: ", length(and_or_landmark.nodes))

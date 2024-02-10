@@ -1,7 +1,8 @@
 export and_or_landmark_extraction
+using SymbolicPlanners
 
 """
-TEMP TEMP TEMP THIS IS COPIED!
+TEMP TEMP TEMP THIS IS COPIED! -> from ka
 """
 function map_condition_action(pgraph::PlanningGraph)
   map = Vector{Vector{Int}}()
@@ -193,16 +194,131 @@ end
 
 extract landmarks by converting plangraph to an and/or graph
 """
+struct andOrGraphs
+  nodes
+  childindeces
+  initialsNodes
+  AndNodes
+  OrNodes
+end
+
+#TODO tyoe of node should be implcit by position in tree -> init is fact, child is action, child is faact...
+@enum andOR_node_type AND=1 OR=2 I=3
+
+# struct andOr_node
+#   index::Int
+#   type::andOR_node_type
+#   parents::Vector[Int] #nesc?
+#   and_children::Vector[Int] #refs prgraph actions
+#   or_children::Vector[Int] #refs prgraph conditions
+# end
+
+
+
 function and_or_landmark_extraction(domain::Domain, problem::Problem)
+  println("start and or extraction")
   initial_state = initstate(domain, problem)
   spec = Specification(problem)
-  pgraph = build_planning_graph(domain, initial_state, spec)
+
+  pgraph::PlanningGraph = build_planning_graph(domain, initial_state, spec)
+
   
-  #what is label graph? why nesc? --> assming part of zhu and givan alg
-  init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
-  #label_graph = create_label_layer(pgraph, init_idxs)
+  and/or = build_and_or(pgraph, domain, problem)
 
   goals = pgraph.act_parents[end]
+  
+
+
+println("start building graph")
+##    #build AND/OR graph : nodes types I, OR, AND
+  
+  #TODO is julia convenrion: keep or remove types?  -> ive put them to inspect structs but idk if better or worse
+  #TODO conv tuples to structs -> because keeping track of f[1], f[2] is asss
+  #get actions, facts, inital states from probelm data
+  all_facts::Vector{Term} = pgraph.conditions
+  all_actions::Vector{GroundAction} = pgraph.actions
+  initial_fact_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
+  initial_facts = pgraph.conditions[initial_fact_idxs]
+
+  #nodes + edges representaion
+  # node : [originial index in pgraph representation, value/info of action or term, string repr of and/or/i]
+  # edges : [from , to] -> indexes in node set
+
+  node_set = Vector() #Tuple{Int, Any, String}
+  edge_set = Vector() #Tuple{Int, Int}
+  
+  # create sets I , AND, OR from prev sets #TODO -> these are just maps
+      
+      #I = initial facts 
+      i_set = Vector{Tuple{Int, Term, String}}() #TODO nesc?
+      for (i,f) in enumerate(initial_facts) # i doesnt make any sense here -> doesnt ref og facts
+        push!(i_set, (i, f, "I"))
+        push!(node_set, (i, f, "I"))
+        print("\t\tadded I")
+      end
+
+      #traverse facts -> add or nodes
+      or_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
+      for (i,f) in enumerate(all_facts)
+        push!(or_set, (i, f, "OR"))
+        push!(node_set, (i, f, "OR"))
+        print("\t\tadded O")
+      end
+      
+      #traverse all actions -> add and nodes + connections to or nodes
+      and_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
+      for (i, a::GroundAction) in enumerate(all_actions)
+
+        #if no op ->  -> is made to represent a variable that doesnt change in some representations
+        #TODO -> pre and post are both compund terms, do these need to be broken up or is it magically consistent with fact set? -> assuming its fine
+        
+        #add nodes
+        push!(and_set, (i, a, "AND"))
+        push!(node_set, (i, a, "AND"))
+        print("\t\tadded A")
+
+        #get pre and post tems
+        pre::Term = PDDL.get_precond( a) # name & args
+        post::Term = PDDL.get_effect( a)
+        # add edges
+        # (action -> fact) if in effect
+        # (fact -> action) if in precondition of action
+        for f in i_set 
+          if occursin(f[2] , pre.args)
+            push!(edge_set, (f[1], i))
+            print("\t\tadded E")
+          end
+          if f[2] == post
+            push!(edge_set, (i, f[1]))
+            print("\t\tadded E")
+          end
+        end
+
+        for f in or_set #TODO code duplication last block
+          if f[2] == pre
+            push!(edge_set, (f[1], i))
+            print("\t\tadded E")
+          end
+          if f[2] == post
+            push!(edge_set, (i, f[1]))
+            print("\t\tadded E")
+          end
+        end
+
+      end
+
+    #and or is now node set + edge set
+    println("\ngenerated graph:\n\n")
+    println("\n\tnodes: " , node_set)
+    println("\n\tedges: ", edge_set)
+
+
+  #get set of facts from landmark graph :: TODO  this is ass -> they got it from pgraphs conditions??
+  #var in FactPair refers to condition in pgraph.conditions -> useless without pgraph.conditions
+  landmark_graph_data::LandmarkGenerationData, landmark_graph::LandmarkGraph = compute_relaxed_landmark_graph(domain, initial_state, spec).first
+  i_state::Vector{FactPair} = landmark_graph_data.initial_state
+  
+
 
 
   #build AND/OR graph : nodes I, OR, AND
@@ -210,16 +326,44 @@ function and_or_landmark_extraction(domain::Domain, problem::Problem)
   #write check_fixpoint()
 
 
-  landmark_graph = generate_landmarks_draft(pgraph, goals)
+  landmark_graph = compute_fixpoint(and/or)
 
   return landmark_graph
 end
 
-function generate_landmarks(pgraph::PlanningGraph, goal) 
+
+#create and or and keep track of ordering of nodes in pgraph
+function build_and_or(pgraph::PlanningGraph, domain::Domain, problem::Problem)
+  # find init nodes, action set, state var set TODO: nesc?
+  init_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
+  # as = pgraph.actions
+  # fs = pgraph.conditions
+
+
+  #STRIPS INFO : actions, facts, initial states,goal states
+  as = PDDL.get_actions(domain)
+  fs = PDDL.get_fluents(domain) #problem: fluents are functions? this is ok as they are unnasigned state vars :P -> NO! facts are predicates, terms are anything
+  #TODO: get facts from compute_landmark_graph -> get all facts from set and init to 0? -> gives set of facts. facts in I can be 1
+  
+  is = PDDL.get_init_terms(problem) # a term is an assigned fluent or constant?
+  gs = PDDL.get_goal(problem)
+  
+  # create sets I , AND, OR from prev sets
+  
+
+
+  #traverse facts -> add or nodes
+  #traverse action -> add and nodes + connections to or nodes
+
+  #  add edges by traversing actions
+  # (action -> fact) if in effect
+  # (fact -> action) if in precondition of action
+end
+
+function compute_fixpoint(pgraph) 
   #build graph : nodes I, OR, AND
 
-  "assign vals untill fixpoint is found :
-
+  "from paper
           One way to
           compute the solution is to perform a ﬁxpoint computation in which
           the set of landmarks for each vertex except those in VI is initialized
@@ -232,61 +376,81 @@ function generate_landmarks(pgraph::PlanningGraph, goal)
           marks as well as causal fact landmarks. If only fact landmarks are
           sought, the equation for AND nodes can be modiﬁed to not include
           {v} in LM(v).
+    concl: updating in order of plangraph gives same alg? -> maybe later
   "
-  #write check_fixpoint()
+  # traverse graph untill fixpoint: gives landmark set
+  # LM(Vg) = uninion of all returned 
+  # 			for v in VG
+  # 				 LM(v)
+  # this is where plangraph ordering of nodes is important-> calling LM(v) over all nodes. 
+
+  # LM(v) = 
+  # 		if v in I
+  # 			 -> {v}
+  # 		if v in OR
+  # 				-> {v} intersect 
+  # 						for u in pre(v)
+  # 							 LM(u)
+  # 		if v in AND
+  # 				-> {v} union
+  # 						for u in pre(v)
+  # 							 LM(u)
+                
+  # Pre(v) = u for all <u, v> in E -> its a map :)
 end
 
-function generate_landmarks_draft(planning_graph::PlanningGraph, goal)
-  # Initialize landmarks for all nodes
-  landmarks = Dict{Int, Set{Int}}()
-  for i in 1:length(planning_graph.conditions)
-      landmarks[i] = Set([i])
-  end
+# function generate_landmarks_chatgpt(planning_graph::PlanningGraph, goal)
+#   # Initialize landmarks for all nodes
+#   landmarks = Dict{Int, Set{Int}}()
+#   for i in 1:length(planning_graph.conditions)
+#       landmarks[i] = Set([i])
+#   end
 
-  for i in 1:length(planning_graph.actions)
-      landmarks[i + planning_graph.n_goals] = Set([i + planning_graph.n_goals])
-  end
+#   for i in 1:length(planning_graph.actions)
+#       landmarks[i + planning_graph.n_goals] = Set([i + planning_graph.n_goals])
+#   end
 
-  # Update landmarks until fixpoint is reached
-  while true
-      updated_landmarks = copy(landmarks)
+#   # Update landmarks until fixpoint is reached
+#   while true
+#       updated_landmarks = copy(landmarks)
 
-      for i in 1:length(planning_graph.conditions)
-          # Update landmarks for condition nodes
-          if !planning_graph.cond_derived[i]
-              parents = get_parents(planning_graph, i)
-              #TODO strange union / intersection thing happening here : ⋂
-              updated_landmarks[i] = Set([i]) ∪ ([landmarks[parent] for parent in parents])
-          end
-      end
+#       for i in 1:length(planning_graph.conditions)
+#           # Update landmarks for condition nodes
+#           if !planning_graph.cond_derived[i]
+#               parents = get_parents(planning_graph, i)
+#               #TODO strange union / intersection thing happening here : ⋂
+#               updated_landmarks[i] = Set([i]) ∪ ([landmarks[parent] for parent in parents])
+#           end
+#       end
 
-      for i in 1:length(planning_graph.actions)
-          # Update landmarks for action nodes
-          children = planning_graph.act_children[i]
-          updated_landmarks[i + planning_graph.n_goals] = Set([i + planning_graph.n_goals]) ∪ ([landmarks[child] for child in children])
-      end
+#       for i in 1:length(planning_graph.actions)
+#           # Update landmarks for action nodes
+#           children = planning_graph.act_children[i]
+#           #current version breaks here
+#           updated_landmarks[i + planning_graph.n_goals] = Set([i + planning_graph.n_goals]) ∪ ([landmarks[child] for child in children])
+#       end
 
-      # Check for fixpoint
-      if updated_landmarks == landmarks 
-          break
-      end
+#       # Check for fixpoint
+#       if updated_landmarks == landmarks 
+#           break
+#       end
 
-      landmarks = updated_landmarks
-  end
+#       landmarks = updated_landmarks
+#   end
 
-  # Return the set of landmarks for the goal node
-  goal_node_index = findfirst(x -> x == goal, planning_graph.conditions)
-  return ∪([landmarks[goal_node_index] for goal_node_index in goal_node_indices])
-end
+#   # Return the set of landmarks for the goal node
+#   goal_node_index = findfirst(x -> x == goal, planning_graph.conditions)
+#   return ∪([landmarks[goal_node_index] for goal_node_index in goal_node_indices])
+# end
 
-function get_parents(planning_graph::PlanningGraph, node_index::Int)
-  parents = Set{Int}()
+# function get_parents(planning_graph::PlanningGraph, node_index::Int)
+#   parents = Set{Int}()
 
-  for (i, children) in enumerate(planning_graph.cond_children)
-      if any(x -> x == node_index, children)
-          push!(parents, i)
-      end
-  end
+#   for (i, children) in enumerate(planning_graph.cond_children)
+#       if any(x -> x == node_index, children)
+#           push!(parents, i)
+#       end
+#   end
 
-  return parents
-end
+#   return parents
+# end
