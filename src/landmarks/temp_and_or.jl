@@ -14,14 +14,22 @@ extract landmarks by converting plangraph to an and/or graph
   # end
 
 
-  @enum andOR_node_type AND=1 OR=2 init=3
+  @enum node_type AND=1 OR=2 init=3
+
+  struct andOr_edge
+    from::Int
+    to::Int
+  end
+  #TODO edge list very easy -> redo if impl fixpoint becomes easier
+  # nodes = [node]
+  # out edge per node = [int]
+  # in edge per node = [int] -> redundant but should make landmark finding easier
 
   struct andOr_node
-    index::Int
-    type::andOR_node_type
-    parents::Vector[Int] #nesc?
-    and_children::Vector[Int] #refs prgraph actions
-    or_children::Vector[Int] #refs prgraph conditions
+    og_index::Int #is this even nesc?
+    term::Any #TODO putting any is bad, is having term even nescesary? -> yes because we need to know what the actual landmark is.
+    type::node_type
+    parents::Vector[Int]
   end
 
 
@@ -43,9 +51,6 @@ function and_or_landmark_extraction(domain::Domain, problem::Problem)
   #build AND/OR graph : nodes I, OR, AND
   #assign vals untill fixpoint is found
   #write check_fixpoint()
-
-
-  
 
   return landmark_graph
 end
