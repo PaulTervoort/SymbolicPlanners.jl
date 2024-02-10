@@ -76,75 +76,70 @@ function build_and_or(domain::Domain, problem::Problem)
   # edges : [from , to] -> indexes in node set
 
   nodes = Vector() 
-  edges = Vector() # TODO PUSH EDGE ENTRY WHEN NODE IS PUSHED!!!
+  edges_to_child = Vector()
+  edges_to_pred = Vector()
   
   # create sets I , AND, OR from prev sets #TODO -> these are just maps?
       
       #I = initial facts 
-      #i_set = Vector{Tuple{Int, Term, String}}() #TODO nesc?
       for (i,f) in enumerate(initial_facts) # TODO i doesnt make any sense here -> doesnt ref og facts
        # push!(i_set, (i, f, "I"))
         push!(nodes, (i, f, "I"))
-        push!(edges, (lastindex(nodes), Vector{Int}())) #TODO i here for tests, but not nesc
+        push!(edges_to_child, Vector{Int}()) 
+        push!(edges_to_pred, Vector{Int}()) 
       end
 
       #traverse facts -> add or nodes
-      #or_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
       for (i,f) in enumerate(all_facts)
         if isnothing(findfirst( x -> x[2] == f, nodes))  #TODO use of findfirst is ass here
       #    push!(or_set, (i, f, "OR"))
           push!(nodes, (i, f, "OR"))
-          push!(edges, (lastindex(nodes), Vector{Int}()))
+          push!(edges_to_child,  Vector{Int}())
+          push!(edges_to_pred, Vector{Int}()) 
         end
       end
       
       #traverse all actions -> add and nodes + connections to or nodes
-      #and_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
+
       for (action_i, a::GroundAction) in enumerate(all_actions)
 
         #if no op ->  -> is made to represent a variable that doesnt change in some representations
         #TODO -> pre and post are both compund terms, do these need to be broken up or is it magically consistent with fact set? -> assuming its fine
         
         #add nodes
-      #  push!(and_set, (action_i, a, "AND"))
         push!(nodes, (action_i, a, "AND"))
 
         node_i = lastindex(nodes)
-        push!(edges, (node_i, Vector{Int}()))
+        push!(edges_to_child, Vector{Int}())
+        push!(edges_to_pred, Vector{Int}()) 
 
         #get pre and post tems
         pre_conds::Term = PDDL.get_precond( a)   # term = name & args
         post_effs::Term = PDDL.get_effect( a)
         # add edges
-        # (fact -> action) if in precondition of action
+        # edge (fact -> action) if in precondition of action
         for pre in pre_conds.args
           fact_i = findfirst( x -> x[2] == pre, nodes)
           if fact_i !== nothing
-            push!(edges[fact_i][2], node_i)
+            push!(edges_to_child[fact_i], node_i)
+            push!(edges_to_pred[node_i], fact_i)
 
           end
         end
-        # (action -> fact) if in effect
-        # TODO do not add link if it is a delete effect
+
+        # edge (action -> fact) if in add effect
         for post in post_effs.args #TODO code duplic
           if post.name !== :not # skip if 'not' term -> delete effect represented by 'not' term
             fact_i = findfirst( x -> x[2] == post, nodes)
             if fact_i !== nothing 
-              push!(edges[node_i][2], fact_i) 
+              push!(edges_to_child[node_i], fact_i)
+              push!(edges_to_pred[fact_i], node_i)  
             end
           end
         end
       end
 
-    # #TODO do edge struct like this in prev blocks instead of rewriting
-    # #rewrite edges
-    # temp_edges = Array{Vector{Any}}(Vector(), length(nodes))
-    # for e in edges
-    #   push!(temp_edges[e[1]], e[2])
-    # end
-    # edges = temp_edges
-
-    return (nodes, edges)
+    return (nodes, edges_to_pred)
 end
 
 #TODO : check if landmark graph has nescesary properties named in paper -> should be a justifixcation 
@@ -182,17 +177,20 @@ function gen_landmarks(nodes::Vector, edges::Vector)
   landmarks = Set()
 
  # 			for v in VG
-  for i in range(1, length(nodes))
+  for i in range(1, lastindex(nodes))
     landmarks = union!(landmarks, gen_node_landmarks(i, nodes, edges))
   end
+
+  return landmarks
   
   
 end
 
 function gen_node_landmarks(i::Int , nodes::Vector, edges::Vector)
   # init with v -> v is a landmark for itself
-  curr_node = nodes[i]
-  node_landmarks = Set(curr_node[2]);
+  curr_node = nodes[i] #stacktrace?
+  node_landmarks = Set()
+  push!(node_landmarks, curr_node[2])
   
 
   #cases by node type
@@ -203,20 +201,18 @@ function gen_node_landmarks(i::Int , nodes::Vector, edges::Vector)
 # 						for u in pre(v)
 # 							 LM(u)
     for pred_i in edges[i]
-      intersect!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges))
+      node_landmarks = push!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges)) #should be intersect
     end   
   elseif curr_node[3] == "AND"
 # 				-> {v} union
 # 						for u in pre(v)
 # 							 LM(u)
     for pred_i in edges[i]
-      union!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges))
+      node_landmarks = push!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges))#should be union
     end
   end
 end
 
-
-              
 # # Pre(v) = u for all <u, v> in E -> its a map :)
 # function get_previous_nodes_idxs(node_index::Int, edges:: Vector{Int, Int})
 
