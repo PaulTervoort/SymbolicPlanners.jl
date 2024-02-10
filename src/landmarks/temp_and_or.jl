@@ -16,34 +16,27 @@ extract landmarks by converting plangraph to an and/or graph
 
   @enum node_type AND=1 OR=2 init=3
 
-  struct andOr_edge
-    from::Int
-    to::Int
-  end
   #TODO edge list very easy -> redo if impl fixpoint becomes easier
   # nodes = [node]
   # out edge per node = [int]
   # in edge per node = [int] -> redundant but should make landmark finding easier
 
-  struct andOr_node
-    og_index::Int #is this even nesc?
-    term::Any #TODO putting any is bad, is having term even nescesary? -> yes because we need to know what the actual landmark is.
-    type::node_type
-    parents::Vector[Int]
-  end
+# struct andOr_node
+#   term::Any #TODO putting any is bad, is having term even nescesary? -> yes because we need to know what the actual landmark is.
+#   type::node_type
+#   parents::Vector[Int]
+#  end
 
 
 
 function and_or_landmark_extraction(domain::Domain, problem::Problem)
   println("start and or extraction")
 
-  
-
   println("start building graph")
-  and_or = build_and_or(domain, problem)
+  (nodes, edges) = build_and_or(domain, problem)
 
   println("start landmark generation")
-  landmark_graph = compute_fixpoint(and_or)
+  landmark_graph = gen_landmarks(nodes, edges)
 
   #check solution?
   #goals = pgraph.act_parents[end]
@@ -70,8 +63,11 @@ function build_and_or(domain::Domain, problem::Problem)
   #TODO is julia convenrion: keep or remove types?  -> ive put them to inspect structs but idk if better or worse
   #TODO conv tuples to structs -> because keeping track of f[1], f[2] is asss
   #get actions, facts, inital states from probelm data
+
+  #todo remove unnesc structs 
   all_facts::Vector{Term} = pgraph.conditions
   all_actions::Vector{GroundAction} = pgraph.actions
+
   initial_fact_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
   initial_facts = pgraph.conditions[initial_fact_idxs]
 
@@ -79,37 +75,37 @@ function build_and_or(domain::Domain, problem::Problem)
   # node : [originial index in pgraph representation, value/info of action or term, string repr of and/or/i]
   # edges : [from , to] -> indexes in node set
 
-  nodes = Vector() #Tuple{Int, Any, String}
-  edges = Vector() #Tuple{Int, Int}
+  nodes = Vector() 
+  edges = Vector()
   
   # create sets I , AND, OR from prev sets #TODO -> these are just maps?
       
       #I = initial facts 
-      i_set = Vector{Tuple{Int, Term, String}}() #TODO nesc?
+      #i_set = Vector{Tuple{Int, Term, String}}() #TODO nesc?
       for (i,f) in enumerate(initial_facts) # TODO i doesnt make any sense here -> doesnt ref og facts
-        push!(i_set, (i, f, "I"))
+       # push!(i_set, (i, f, "I"))
         push!(nodes, (i, f, "I"))
       end
 
       #traverse facts -> add or nodes
-      or_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
+      #or_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
       for (i,f) in enumerate(all_facts)
         if isnothing(findfirst( x -> x[2] == f, nodes))  #TODO use of findfirst is ass here
-          push!(or_set, (i, f, "OR"))
+      #    push!(or_set, (i, f, "OR"))
           push!(nodes, (i, f, "OR"))
 
         end
       end
       
       #traverse all actions -> add and nodes + connections to or nodes
-      and_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
+      #and_set = Vector{Tuple{Int, Term, String}}()  #TODO nesc?
       for (action_i, a::GroundAction) in enumerate(all_actions)
 
         #if no op ->  -> is made to represent a variable that doesnt change in some representations
         #TODO -> pre and post are both compund terms, do these need to be broken up or is it magically consistent with fact set? -> assuming its fine
         
         #add nodes
-        push!(and_set, (action_i, a, "AND"))
+      #  push!(and_set, (action_i, a, "AND"))
         push!(nodes, (action_i, a, "AND"))
         node_i = lastindex(nodes)
 
@@ -137,11 +133,20 @@ function build_and_or(domain::Domain, problem::Problem)
         end
       end
 
+    #TODO do edge struct like this in prev blocks instead of rewriting
+    #rewrite edges
+    temp_edges = Array{Vector{Any}}(Vector(), length(nodes))
+    for e in edges
+      push!(temp_edges[e[1]], e[2])
+    end
+    edges = temp_edges
+
     return (nodes, edges)
 end
 
 #TODO : check if landmark graph has nescesary properties named in paper -> should be a justifixcation 
-function assertDisjunctiveGraphSets()
+function assertDisjunctiveGraphSets(nodes::Vector, edges::Vector)
+
   """
     1) all nodes must be proven?
     2) AND nodes are true if all predecessors are true
@@ -150,7 +155,7 @@ function assertDisjunctiveGraphSets()
   """
 end
 
-function compute_fixpoint(pgraph) 
+function gen_landmarks(nodes::Vector, edges::Vector) 
 
 
   "from paper
@@ -169,22 +174,46 @@ function compute_fixpoint(pgraph)
     concl: updating in order of plangraph gives same alg? -> maybe later -> can we say order is implicit because we generate graph from plangraph?
   "
   # traverse graph untill fixpoint: gives landmark set
-  # LM(Vg) = uninion of all returned 
-  # 			for v in VG
-  # 				 LM(v)
-  # this is where plangraph ordering of nodes is important-> calling LM(v) over all nodes. 
+  # LM(Vg) = uninion of all returned from
+  #""
+  landmarks = Set()
 
-  # LM(v) = 
-  # 		if v in I
-  # 			 -> {v}
-  # 		if v in OR
-  # 				-> {v} intersect 
-  # 						for u in pre(v)
-  # 							 LM(u)
-  # 		if v in AND
-  # 				-> {v} union
-  # 						for u in pre(v)
-  # 							 LM(u)
-                
-  # Pre(v) = u for all <u, v> in E -> its a map :)
+ # 			for v in VG
+  for i in range(1, length(nodes))
+    landmarks = union!(landmarks, gen_node_landmarks(i, nodes, edges))
+  end
+  
+  
 end
+
+function gen_node_landmarks(i::Int , nodes::Vector, edges::Vector)
+  # init with v -> v is a landmark for itself
+  node_landmarks = Set(curr_node[2]);
+  curr_node = nodes[i]
+
+  #cases by node type
+  if curr_node[3] == "I"
+    return node_landmarks;
+  elseif curr_node[3] == "OR"
+#				-> {v} intersect 
+# 						for u in pre(v)
+# 							 LM(u)
+    for pred_i in edges[i]
+      intersect!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges))
+    end   
+  elseif curr_node[3] == "AND"
+# 				-> {v} union
+# 						for u in pre(v)
+# 							 LM(u)
+    for pred_i in edges[i]
+      union!(node_landmarks, gen_node_landmarks(pred_i, nodes, edges))
+    end
+  end
+end
+
+
+              
+# # Pre(v) = u for all <u, v> in E -> its a map :)
+# function get_previous_nodes_idxs(node_index::Int, edges:: Vector{Int, Int})
+
+# end
