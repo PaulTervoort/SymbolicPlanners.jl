@@ -5,18 +5,17 @@ using SymbolicPlanners
 extract landmarks by creating an and/or graph and 
 """
 function and_or_landmark_extraction(domain::Domain, problem::Problem)
-  println("start and or extraction")
-
-  println("start building graph")
   (nodes, edges, goal_idxs) = build_and_or(domain, problem)
 
-  println("start landmark generation")
   landmarks_per_node = gen_landmarks(nodes, edges)
 
   node_count = size(nodes)
+  n_goals = size(goal_idxs)
+  goal_landmarks = landmarks_per_node[goal_idxs]
+  #show(goal_landmarks)
   landmark_count = size(unique(Base.Flatten(landmarks_per_node[goal_idxs])))
 
-  return (node_count , landmark_count)
+  return (node_count , landmark_count, n_goals)
 end
 #TODO use 'in' instead of contains or weird shit
 
@@ -42,8 +41,6 @@ function build_and_or(domain::Domain, problem::Problem)
 
   goal_og_idxs = map(x -> x[1],  pgraph.act_parents[end]) #TODO this is flatten but awful
 
-  goals_check = pgraph.act_parents[end]
-  show(goals_check)
   # nodes + edges representaion
   # node : [originial index in pgraph representation, value/info of action or term, string repr of and/or/i]
   # edges : [from , to] -> indexes in node set

@@ -1,5 +1,6 @@
 using PDDL, SymbolicPlanners, Test, PlanningDomains
 using Debugger, PDDL, PlanningDomains, SymbolicPlanners
+using CSV
 
 println("Started")
 
@@ -26,9 +27,14 @@ for i in 1:9
     #spec = Specification(problem)
 
     stats = @timed begin
-       (node_count, landmark_count) = and_or_landmark_extraction(domain, problem)
+       (node_count, landmark_count, goals) = and_or_landmark_extraction(domain, problem)
     end
     println("AND / OR Landmark extraction in ", stats.time, " seconds")
     println("Number of nodes: ", node_count)
     println("Number of landmarks: ", landmark_count)
+    println("Number of goals: ", goals)
+
+
+    #TODO: write to file 
+    #data = [1, 2, 3] CSV.write("output.csv", data)
 end
