@@ -180,69 +180,69 @@ function gen_landmarks(nodes::Vector, edges::Vector)
   lms_per_node = Vector()
   
   # initialize as all nodes have all nodes as landmarks 
+  #landmarks are tracked as indexes of nodes, extracted later -> not bit vector as union funct needs to work ()
   for i in range(1, lastindex(nodes))
-    push!(lms_per_node, copy(nodes))
+    push!(lms_per_node, range(1, lastindex(nodes)))
   end
 
-  #traversal queue 
+  #init traversal queue #TODO ugly
   nodes_left = Vector()
-
-  for x::Int64 in range(1, lastindex(nodes)) #TODO ugly
+  for x::Int64 in range(1, lastindex(nodes)) 
     push!(nodes_left, x)
   end
 
   #update untill fixpoint reached
   while true
-    i = popfirst!(nodes_left)
+          idx_curr = popfirst!(nodes_left)
 
-    #temp for fixpoint check
-    temp_lms_per_node = copy(lms_per_node)
-    curr_node = nodes[i]
+          #temp for fixpoint check
+          temp_lms_per_node = copy(lms_per_node)
+          curr_node = nodes[idx_curr]
 
-    #OLD
-    # # for v in VG
-    # for i in range(1, lastindex(nodes))
-    #   landmarks = union!(landmarks, gen_node_landmarks(i, nodes, edges))
-    # end
+        #cases by node type
 
-
-
-
-    #cases by node type
-
-    # Init node's landmark is itself
-    if curr_node[3] == "I"
-      temp_lms_per_node[i] = [curr_node[2]]
-    #Or node's landmark is intersection of all its preconditions landmarks
-    elseif curr_node[3] == "OR"
-      temp_lms_per_node[i] = [curr_node[2]]
-      for pred_i in edges[i]
-        temp_lms_per_node[i] = intersect!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
-      end   
-    #And node's landmark is union of all its preconditions landmarks
-    elseif curr_node[3] == "AND"
-      temp_lms_per_node[i] = [curr_node[2]]
-      for pred_i in edges[i]
-        temp_lms_per_node[i] = union!(temp_lms_per_node[i], temp_lms_per_node[pred_i])
-      end
-    end
+          # Init node's landmark is itself
+          if curr_node[3] == "I"
+            temp_lms_per_node[idx_curr] = [idx_curr]
+          #Or node's landmark is intersection of all its preconditions landmarks
+          elseif curr_node[3] == "OR"
+            temp_lms_per_node[idx_curr] = [idx_curr]
+            for pred_i in edges[idx_curr]
+              temp_lms_per_node[idx_curr] = intersect!(temp_lms_per_node[idx_curr], temp_lms_per_node[pred_i])
+            end   
+          #And node's landmark is union of all its preconditions landmarks
+          elseif curr_node[3] == "AND"
+            temp_lms_per_node[idx_curr] = [idx_curr]
+            for pred_i in edges[idx_curr]
+              temp_lms_per_node[idx_curr] = union!(temp_lms_per_node[idx_curr], temp_lms_per_node[pred_i])
+            end
+          end
 
 
 
-    #stop of fixpoint reached
-    #  if temp_lms_per_node == lms_per_node
-    #     break
-    #  else
-    #   lms_per_node = temp_lms_per_node
-    #  end
+          #stop of fixpoint reached
+           if temp_lms_per_node == lms_per_node
+              break
+           elseif isempty(nodes_left)
+            #refill with non init nodes because these will always have themself as landmarks -> breaks alg early
+              for x::Int64 in range(1, lastindex(nodes)) 
+                if nodes[x][3] !== "I"
+                 push!(nodes_left, x)
+                end    
+              end
+              print("refilled!")
+           end
 
-    if size(nodes_left) == 0
-      break
-    end
-    lms_per_node = temp_lms_per_node
+
+          lms_per_node = temp_lms_per_node
+          # if size(nodes_left) == 0
+          #   break
+          # end
+          # lms_per_node = temp_lms_per_node
 
   end  
-
+  #TODO lms per node => lms of goals
+  #TODO lms idxs to terms and groundactions
   return landmarks
   
   
