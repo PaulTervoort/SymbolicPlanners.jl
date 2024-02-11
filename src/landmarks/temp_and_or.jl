@@ -41,10 +41,6 @@ function and_or_landmark_extraction(domain::Domain, problem::Problem)
   #check solution?
   #goals = pgraph.act_parents[end]
 
-  #build AND/OR graph : nodes I, OR, AND
-  #assign vals untill fixpoint is found
-  #write check_fixpoint()
-
   return landmark_graph
 end
 
@@ -182,7 +178,7 @@ function gen_landmarks(nodes::Vector, edges::Vector)
   # initialize as all nodes have all nodes as landmarks 
   #landmarks are tracked as indexes of nodes, extracted later -> not bit vector as union funct needs to work ()
   for i in range(1, lastindex(nodes))
-    push!(lms_per_node, range(1, lastindex(nodes)))
+    push!(lms_per_node, collect(range(1, lastindex(nodes))))
   end
 
   #init traversal queue #TODO ugly
@@ -200,22 +196,24 @@ function gen_landmarks(nodes::Vector, edges::Vector)
           curr_node = nodes[idx_curr]
 
         #cases by node type
-
+          temp_lms_per_node[idx_curr] = []
           # Init node's landmark is itself
           if curr_node[3] == "I"
             temp_lms_per_node[idx_curr] = [idx_curr]
-          #Or node's landmark is intersection of all its preconditions landmarks
+          #Or node's landmark is intersection of all its preconditions landmarks and itself
           elseif curr_node[3] == "OR"
-            temp_lms_per_node[idx_curr] = [idx_curr]
+
             for pred_i in edges[idx_curr]
               temp_lms_per_node[idx_curr] = intersect!(temp_lms_per_node[idx_curr], temp_lms_per_node[pred_i])
             end   
-          #And node's landmark is union of all its preconditions landmarks
+            temp_lms_per_node[idx_curr] = union!(temp_lms_per_node[idx_curr], [idx_curr])
+          #And node's landmark is union of all its preconditions landmarks and itself
           elseif curr_node[3] == "AND"
-            temp_lms_per_node[idx_curr] = [idx_curr]
+
             for pred_i in edges[idx_curr]
               temp_lms_per_node[idx_curr] = union!(temp_lms_per_node[idx_curr], temp_lms_per_node[pred_i])
             end
+            temp_lms_per_node[idx_curr] = union!(temp_lms_per_node[idx_curr], [idx_curr])
           end
 
 
@@ -243,6 +241,11 @@ function gen_landmarks(nodes::Vector, edges::Vector)
   end  
   #TODO lms per node => lms of goals
   #TODO lms idxs to terms and groundactions
+
+  for lms in lms_per_node
+    push!(landmarks, map(x-> nodes[x][2] , lms))
+  end
+
   return landmarks
   
   
