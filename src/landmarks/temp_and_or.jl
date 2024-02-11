@@ -2,50 +2,23 @@ export and_or_landmark_extraction
 using SymbolicPlanners
 
 """
-extract landmarks by converting plangraph to an and/or graph
+extract landmarks by creating an and/or graph and 
 """
-
-  # struct andOrGraphs
-  #   nodes
-  #   childindeces
-  #   initialsNodes
-  #   AndNodes
-  #   OrNodes
-  # end
-
-
-  @enum node_type AND=1 OR=2 init=3
-
-  #TODO edge list very easy -> redo if impl fixpoint becomes easier
-  # nodes = [node]
-  # out edge per node = [int]
-  # in edge per node = [int] -> redundant but should make landmark finding easier
-
-# struct andOr_node
-#   term::Any #TODO putting any is bad, is having term even nescesary? -> yes because we need to know what the actual landmark is.
-#   type::node_type
-#   parents::Vector[Int]
-#  end
-
-
-
 function and_or_landmark_extraction(domain::Domain, problem::Problem)
   println("start and or extraction")
 
   println("start building graph")
-  (nodes, edges) = build_and_or(domain, problem)
+  (nodes, edges, goal_idxs) = build_and_or(domain, problem)
 
   println("start landmark generation")
-  landmark_graph = gen_landmarks(nodes, edges)
+  landmarks_per_node = gen_landmarks(nodes, edges)
 
-  #check solution?
-  #goals = pgraph.act_parents[end]
+  node_count = size(nodes)
+  landmark_count = size(unique(Base.Flatten(landmarks_per_node[goal_idxs])))
 
-  return landmark_graph
+  return (node_count , landmark_count)
 end
-
-
-
+#TODO use 'in' instead of contains or weird shit
 
 
 ###build AND/OR graph : nodes types I, OR, AND
@@ -56,7 +29,7 @@ function build_and_or(domain::Domain, problem::Problem)
   initial_state = initstate(domain, problem)
   spec = Specification(problem)
   pgraph::PlanningGraph = build_planning_graph(domain, initial_state, spec)
-  #TODO is julia convenrion: keep or remove types?  -> ive put them to inspect structs but idk if better or worse
+  #TODO is julia convention: keep or remove types?  -> ive put them to inspect structs but idk if better or worse
   #TODO conv tuples to structs -> because keeping track of f[1], f[2] is asss
   #get actions, facts, inital states from probelm data
 
@@ -67,6 +40,10 @@ function build_and_or(domain::Domain, problem::Problem)
   initial_fact_idxs = pgraph_init_idxs(pgraph, domain, initial_state)
   initial_facts = pgraph.conditions[initial_fact_idxs]
 
+  goal_og_idxs = map(x -> x[1],  pgraph.act_parents[end]) #TODO this is flatten but awful
+
+  goals_check = pgraph.act_parents[end]
+  show(goals_check)
   # nodes + edges representaion
   # node : [originial index in pgraph representation, value/info of action or term, string repr of and/or/i]
   # edges : [from , to] -> indexes in node set
@@ -79,7 +56,7 @@ function build_and_or(domain::Domain, problem::Problem)
       
       #I = initial facts 
       for (i,f) in enumerate(initial_facts) # TODO i doesnt make any sense here -> doesnt ref og facts
-        push!(nodes, (i, f, "I"))
+        push!(nodes, (-1, f, "I")) #TODO -> -1 is bogus
         push!(edges_to_child, Vector{Int}()) 
         push!(edges_to_pred, Vector{Int}()) 
       end
@@ -109,8 +86,8 @@ function build_and_or(domain::Domain, problem::Problem)
         push!(edges_to_pred, Vector{Int}()) 
 
         #get pre and post tems
-        pre_conds::Term = PDDL.get_precond( a)   # term = name & args
-        post_effs::Term = PDDL.get_effect( a)
+        pre_conds::Term = PDDL.get_precond(a)   # term = name & args
+        post_effs::Term = PDDL.get_effect(a)
         # add edges
         # edge (fact -> action) if in precondition of action
         for pre in pre_conds.args
@@ -134,7 +111,15 @@ function build_and_or(domain::Domain, problem::Problem)
         end
       end
 
-    return (nodes, edges_to_pred)
+    #gen goals #TODO this is a strange workaround to bad data structs
+    goal_idxs = Vector()
+    for (i , n) in enumerate(nodes)
+      if n[3] == "OR" && (n[1] in goal_og_idxs)
+        push!(goal_idxs, i )
+      end
+    end
+
+    return (nodes, edges_to_pred, goal_idxs)
 end
 
 #TODO : check if landmark graph has nescesary properties named in paper -> should be a justifixcation 
@@ -149,27 +134,8 @@ function assertDisjunctiveGraphSets(nodes::Vector, edges::Vector)
 end
 
 function gen_landmarks(nodes::Vector, edges::Vector) 
-
-
-  "from paper
-          One way to
-          compute the solution is to perform a ﬁxpoint computation in which
-          the set of landmarks for each vertex except those in VI is initialized
-          to the set of all of the vertices of the graph G and then iteratively
-          updated by interpreting the equations as update rules. If the updates
-          are performed according to the order in which nodes are generated in
-          the relaxed planning graph (i. e., all nodes in the ﬁrst layer, then all
-          nodes in the second layer, etc.), then we obtain exactly the RPG label
-          propagation algorithm by Zhu & Givan [12], computing action land-
-          marks as well as causal fact landmarks. If only fact landmarks are
-          sought, the equation for AND nodes can be modiﬁed to not include
-          {v} in LM(v).
-    concl: updating in order of plangraph gives same alg? -> maybe later -> can we say order is implicit because we generate graph from plangraph?
-  "
   # traverse graph untill fixpoint: gives landmark set
-  # LM(Vg) = uninion of all returned from
-  landmarks = Set()
-
+  landmarks = Vector()
 
   #avoid recurision and overflow -> keep list of landmarks per node & do fixppiont -> iterate untill landmarks dont change or 100x iterations
   # initialize all nodes have all nodes as landmarks 
@@ -228,7 +194,6 @@ function gen_landmarks(nodes::Vector, edges::Vector)
                  push!(nodes_left, x)
                 end    
               end
-              print("refilled!")
            end
 
 
@@ -240,28 +205,20 @@ function gen_landmarks(nodes::Vector, edges::Vector)
 
   end  
   #TODO lms per node => lms of goals
-  #TODO lms idxs to terms and groundactions
-
-  for lms in lms_per_node
+  
+  lm_type_count = Vector()
+  for  lms in lms_per_node
     push!(landmarks, map(x-> nodes[x][2] , lms))
+    #landmarks_as_types = map(x-> show(x) , map(x-> typeof(nodes[x][2]), lms))
+    #print(landmarks_as_types)
+    # n_action_lm = filter(x -> (nodes[x][2]) == GroundAction, lms)
+    # n_fact_lm = filter(x -> typeof(nodes[x][2]) == Term, lms)
+    # push!(lm_type_count, ("fact_lms" =>n_fact_lm , "action_lms" => n_action_lm) )
   end
 
-  return landmarks
-  
+  # n_action_lms = length(matchtype(GroundAction))
+  # n_fact_lms = length(matchtype(Term))
+
+  return (landmarks)
   
 end
-
-function gen_node_landmarks(i::Int , nodes::Vector, edges::Vector)
-  # init with v -> v is a landmark for itself
-  curr_node = nodes[i] #stacktrace?
-  node_landmarks = Set()
-  push!(node_landmarks, curr_node[2])
-  
-
-
-end
-
-# # Pre(v) = u for all <u, v> in E -> its a map :)
-# function get_previous_nodes_idxs(node_index::Int, edges:: Vector{Int, Int})
-
-# end
