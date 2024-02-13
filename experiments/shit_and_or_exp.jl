@@ -2,39 +2,39 @@ using PDDL, SymbolicPlanners, Test, PlanningDomains
 using Debugger, PDDL, PlanningDomains, SymbolicPlanners
 using CSV
 
-println("Started")
-
-#results = Vector Tuple String, Tuple Set, Set, Set end end end()
-#TODO not consitent with current directory
-DOMAIN_TYPE = "logical" # "logical" or "numeric"
-DOMAIN_NAME = "blocksworld" # One of "blocksworld", "logistics", "miconic"
+println("Started importing")
 
 import SymbolicPlanners
 import SymbolicPlanners.build_planning_graph
 import SymbolicPlanners.pgraph_init_idxs
 
-#experiment
-for i in 1:9
-    println("Iteration: ", i)
-    # Load Blocksworld domain and single problem
+println("Start exp")
+#results = Vector Tuple String, Tuple Set, Set, Set end end end()
+for (DOMAIN_TYPE, DOMAIN_NAME, i) in [("logical", "blocksworld", 20 ), ("logical", "grid", 5 ), ("logical", "miconic", 12 )]
 
-    domain_dir = joinpath(@__DIR__, DOMAIN_TYPE, DOMAIN_NAME)
-    domain = load_domain(joinpath(domain_dir, "domain.pddl"))
-    problem = load_problem(joinpath(domain_dir, "instance-$(i).pddl"))
+    println("Domain = " , DOMAIN_NAME)
+    #experiment
+        
+        println("\tIteration: ", i)
+        # Load Blocksworld domain and single problem
 
-    # Initialize state
-    #state = initstate(domain, problem)
-    #spec = Specification(problem)
+        domain_dir = joinpath(@__DIR__, DOMAIN_TYPE, DOMAIN_NAME)
+        domain = load_domain(joinpath(domain_dir, "domain.pddl"))
+        problem = load_problem(joinpath(domain_dir, "instance-$(i).pddl"))
 
-    stats = @timed begin
-       (node_count, landmark_count, goals) = and_or_landmark_extraction(domain, problem)
-    end
-    println("AND / OR Landmark extraction in ", stats.time, " seconds")
-    println("Number of nodes: ", node_count)
-    println("Number of landmarks: ", landmark_count)
-    println("Number of goals: ", goals)
+        # Initialize state
+        #state = initstate(domain, problem)
+        #spec = Specification(problem)
+
+        stats = @timed begin
+        (node_count, landmark_count, goals) = and_or_landmark_extraction(domain, problem)
+        end
+        println("\tAND / OR Landmark extraction in ", stats.time, " seconds")
+        println("\tNumber of nodes: ", node_count)
+        println("\tNumber of landmarks: ", landmark_count)
+        println("\tNumber of goals: ", goals)
 
 
-    #TODO: write to file 
-    #data = [1, 2, 3] CSV.write("output.csv", data)
+        #TODO: write to file 
+        #data = [1, 2, 3] CSV.write("output.csv", data)
 end

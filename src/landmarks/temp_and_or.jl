@@ -143,7 +143,7 @@ function gen_landmarks(nodes::Vector, edges::Vector)
   for i in range(1, lastindex(nodes))
     push!(lms_per_node, collect(range(1, lastindex(nodes))))
   end
-
+  refills = 0
   #init traversal queue #TODO ugly
   nodes_left = Vector()
   for x::Int64 in range(1, lastindex(nodes)) 
@@ -182,17 +182,19 @@ function gen_landmarks(nodes::Vector, edges::Vector)
 
 
           #stop of fixpoint reached
-           if temp_lms_per_node == lms_per_node
+           if temp_lms_per_node == lms_per_node && refills > 3
+              println("\t\t\t fixpoint stopped at ", refills, " refills, \n\t\t\t\tat node: ", idx_curr , " -> " , nodes[idx_curr][3])
               break
            elseif isempty(nodes_left)
             #refill with non init nodes because these will always have themself as landmarks -> breaks alg early
               for x::Int64 in range(1, lastindex(nodes)) 
-                if nodes[x][3] !== "I"
-                 push!(nodes_left, x)
-                end    
+                if nodes[x][3] !== "I"                 push!(nodes_left, x)
+                end 
               end
+              refills = refills +1 #TODO remove
            end
 
+          
 
           lms_per_node = temp_lms_per_node
           # if size(nodes_left) == 0
